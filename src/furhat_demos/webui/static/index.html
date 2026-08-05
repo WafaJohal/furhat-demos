@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Furhat Demos</title>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 640px;
+      margin: 3rem auto;
+      padding: 0 1rem;
+      background: #ffffff;
+      color: #111111;
+    }
+    h1 { margin-bottom: 0.25rem; }
+    p { color: #333333; }
+    .demo { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+    .demo h2 { margin-top: 0; }
+    .options { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+    button {
+      padding: 0.6rem 1rem;
+      border-radius: 6px;
+      border: 1px solid #333;
+      background: #fff;
+      color: #111;
+      cursor: pointer;
+    }
+    button:hover { background: #eee; }
+    #status { margin-top: 1.5rem; font-weight: bold; min-height: 1.5rem; }
+  </style>
+</head>
+<body>
+  <h1>Furhat Demos</h1>
+  <p>Pick a demo, then an option, to start it on the robot.</p>
+  <div id="demos"></div>
+  <div id="status"></div>
+
+  <script>
+    async function loadDemos() {
+      const res = await fetch('/api/demos');
+      const demos = await res.json();
+      const container = document.getElementById('demos');
+      container.innerHTML = '';
+      for (const demo of demos) {
+        const section = document.createElement('div');
+        section.className = 'demo';
+
+        const heading = document.createElement('h2');
+        heading.textContent = demo.name;
+
+        const desc = document.createElement('p');
+        desc.textContent = demo.description;
+
+        const options = document.createElement('div');
+        options.className = 'options';
+        for (const option of demo.options) {
+          const btn = document.createElement('button');
+          btn.textContent = option.name;
+          btn.title = option.description;
+          btn.addEventListener('click', () => selectOption(demo.id, option.id));
+          options.appendChild(btn);
+        }
+
+        section.append(heading, desc, options);
+        container.appendChild(section);
+      }
+    }
+
+    async function selectOption(demoId, optionId) {
+      const status = document.getElementById('status');
+      status.textContent = 'Starting...';
+      try {
+        const res = await fetch('/api/select', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ demo_id: demoId, option_id: optionId }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          status.textContent = `Started: ${data.demo_id} / ${data.option_id}`;
+        } else {
+          status.textContent = 'Failed to start demo.';
+        }
+      } catch (err) {
+        status.textContent = 'Failed to start demo.';
+      }
+    }
+
+    loadDemos();
+  </script>
+</body>
+</html>
