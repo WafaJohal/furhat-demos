@@ -37,3 +37,10 @@ Each entry:
 - **Rationale:** User confirmed only public materials are available at this time.
 - **Status:** holding
 - **Notes:** Revisit if internal FaceVis assets become available later; could change the Demo 2 build approach significantly.
+
+### A-004
+- **Cycle:** cycle-002
+- **Assumption:** `FurhatDemoController`'s connection to a real Furhat instance (`furhat_remote_api.FurhatRemoteAPI(host).say(...)`) works as documented against Furhat Virtual and the physical robot, not just against the mocked `RemoteApi` used in tests.
+- **Rationale:** This environment has no live Furhat/Furhat Virtual instance to test against; the controller was verified by construction (no network call on init, confirmed) and by unit tests with a fake remote-API object, not by an actual `.say()` round-trip.
+- **Status:** holding
+- **Notes:** Flagged as the next backlog item — needs manual verification by the user against Furhat Virtual, then the physical robot, before this is trusted for the real demo.

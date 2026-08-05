@@ -6,7 +6,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from furhat_demos.control import DemoController, LoggingDemoController
+from furhat_demos.config import build_controller
+from furhat_demos.control import DemoController
 from furhat_demos.webui.demos import DEMOS, find_demo, find_option
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -18,7 +19,7 @@ class SelectionRequest(BaseModel):
 
 
 def create_app(controller: DemoController | None = None) -> FastAPI:
-    controller = controller or LoggingDemoController()
+    controller = controller or build_controller()
     app = FastAPI(title="Furhat Demos")
 
     @app.get("/api/demos")

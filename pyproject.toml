@@ -4,13 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "furhat-demos"
-version = "0.1.1"
+version = "0.1.2"
 description = "Furhat robot demos for University of Melbourne Open Day: LLM Q&A personas and FaceVis data visualization"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.110",
     "uvicorn[standard]>=0.29",
+    "furhat-remote-api>=1.0",
 ]
 
 [project.optional-dependencies]
