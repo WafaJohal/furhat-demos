@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-08-05
+### Added
+- `FurhatDemoController`, a real `DemoController` that speaks a placeholder
+  intro via Furhat's Remote API (`furhat_remote_api`) for each demo/option.
+- `FURHAT_HOST` environment variable to select it; unset, the app keeps
+  defaulting to `LoggingDemoController` for local UI development.
+
 ## [0.1.1] - 2026-08-05
 ### Added
 - Web UI (FastAPI + static page) for picking a demo and an option, backed by a

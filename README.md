@@ -2,7 +2,7 @@
 
 ![CI](https://github.com/WafaJohal/furhat-demos/actions/workflows/ci.yml/badge.svg)
 ![coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
-![version](https://img.shields.io/badge/version-0.1.1-blue)
+![version](https://img.shields.io/badge/version-0.1.2-blue)
 
 Two Furhat robot demos for University of Melbourne, School of Computing and Information Systems:
 
@@ -23,7 +23,12 @@ Both demos are driven by an **external Python control plane** talking to the rob
                                                      Remote/Realtime API]
 ```
 
-Currently `DemoController` is a stub (`LoggingDemoController`) that just logs the selection — it gets replaced with a real implementation (LLM/RAG for Demo 1, persona/face-state control for Demo 1 & 2, Melbourne/Victoria data feed for Demo 2) in upcoming cycles.
+`DemoController` has two implementations, selected by the `FURHAT_HOST` environment variable:
+
+- Unset (default) — `LoggingDemoController`, which just logs the selection. Used for local UI development with no robot connected.
+- Set to a host (e.g. `localhost` for Furhat Virtual, or the robot's IP) — `FurhatDemoController`, which connects via `furhat_remote_api` and has the robot speak a placeholder intro for the selected demo/option.
+
+The spoken intros are still placeholders — real RAG/persona logic (Demo 1) and FaceVis logic (Demo 2) land in upcoming cycles.
 
 See `docs/adr/` for the recorded reasoning behind this and other architectural decisions as they're made.
 
@@ -39,6 +44,8 @@ ruff format .    # format
 pre-commit install   # enable local pre-commit hooks
 
 uvicorn furhat_demos.webui.app:app --reload   # run the web UI at http://127.0.0.1:8000
+
+FURHAT_HOST=localhost uvicorn furhat_demos.webui.app:app --reload   # drive Furhat Virtual instead
 ```
 
 Coverage floor: **80%** (ratcheting — see CI).
