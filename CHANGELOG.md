@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-08-05
+### Added
+- `QAEngine` (`furhat_demos.opendemo.qa`): a retrieval-grounded Q&A core for
+  Demo 1. Retrieves relevant chunks from placeholder Open Day/curriculum docs
+  by word-overlap scoring, then answers via an injected `LLMClient` — or
+  returns a fixed "I don't know" style response without calling the LLM at
+  all when no relevant chunk is found.
+- `OpenAIChatClient`, a real `LLMClient` implementation using the `openai`
+  package (needs `OPENAI_API_KEY`); tests use a fake client, no network calls.
+- Placeholder Open Day/curriculum content under `src/furhat_demos/opendemo/data/`.
+
+### Known limitation
+- Retrieval is plain word-overlap (no stemming/embeddings), so it's brittle
+  to vocabulary mismatch between the question and the source text — see
+  ADR-003 and `ASSUMPTIONS.md` A-006.
+
 ## [0.1.3] - 2026-08-05
 ### Added
 - `FurhatDemoController` now ensures an English voice is selected on the
