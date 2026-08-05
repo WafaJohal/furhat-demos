@@ -42,5 +42,12 @@ Each entry:
 - **Cycle:** cycle-002
 - **Assumption:** `FurhatDemoController`'s connection to a real Furhat instance (`furhat_remote_api.FurhatRemoteAPI(host).say(...)`) works as documented against Furhat Virtual and the physical robot, not just against the mocked `RemoteApi` used in tests.
 - **Rationale:** This environment has no live Furhat/Furhat Virtual instance to test against; the controller was verified by construction (no network call on init, confirmed) and by unit tests with a fake remote-API object, not by an actual `.say()` round-trip.
+- **Status:** validated
+- **Notes:** User manually confirmed in cycle-003 development: connecting via `FURHAT_HOST` and pressing a web UI option makes a connected robot speak.
+
+### A-005
+- **Cycle:** cycle-003
+- **Assumption:** The English-voice selection added in cycle-003 (`get_voices()` → pick a voice whose `language` starts with "en" → `set_voice(name=...)`) actually results in the robot speaking with an English voice on a real connection, not just in the mocked unit tests.
+- **Rationale:** No live Furhat/Furhat Virtual instance in this environment to confirm the real `Voice.language` values or that `set_voice` visibly changes the spoken accent/language. Implemented defensively (warns and continues if no match or lookup fails) precisely because this was unverified at write time.
 - **Status:** holding
-- **Notes:** Flagged as the next backlog item — needs manual verification by the user against Furhat Virtual, then the physical robot, before this is trusted for the real demo.
+- **Notes:** Needs manual verification by the user — connect with `FURHAT_HOST` set, trigger a demo, and confirm by ear that the voice is English (and ideally check logs for the "No English voice found" warning, which would indicate the connected robot's voice list doesn't tag English as expected).

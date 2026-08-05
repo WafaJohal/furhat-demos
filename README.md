@@ -2,7 +2,7 @@
 
 ![CI](https://github.com/WafaJohal/furhat-demos/actions/workflows/ci.yml/badge.svg)
 ![coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
-![version](https://img.shields.io/badge/version-0.1.2-blue)
+![version](https://img.shields.io/badge/version-0.1.3-blue)
 
 Two Furhat robot demos for University of Melbourne, School of Computing and Information Systems:
 
@@ -26,7 +26,7 @@ Both demos are driven by an **external Python control plane** talking to the rob
 `DemoController` has two implementations, selected by the `FURHAT_HOST` environment variable:
 
 - Unset (default) — `LoggingDemoController`, which just logs the selection. Used for local UI development with no robot connected.
-- Set to a host (e.g. `localhost` for Furhat Virtual, or the robot's IP) — `FurhatDemoController`, which connects via `furhat_remote_api` and has the robot speak a placeholder intro for the selected demo/option.
+- Set to a host (e.g. `localhost` for Furhat Virtual, or the robot's IP) — `FurhatDemoController`, which connects via `furhat_remote_api`, ensures an English voice is selected (language is tied to voice choice in Furhat's API), and has the robot speak a placeholder intro for the selected demo/option.
 
 The spoken intros are still placeholders — real RAG/persona logic (Demo 1) and FaceVis logic (Demo 2) land in upcoming cycles.
 
