@@ -49,5 +49,12 @@ Each entry:
 - **Cycle:** cycle-003
 - **Assumption:** The English-voice selection added in cycle-003 (`get_voices()` → pick a voice whose `language` starts with "en" → `set_voice(name=...)`) actually results in the robot speaking with an English voice on a real connection, not just in the mocked unit tests.
 - **Rationale:** No live Furhat/Furhat Virtual instance in this environment to confirm the real `Voice.language` values or that `set_voice` visibly changes the spoken accent/language. Implemented defensively (warns and continues if no match or lookup fails) precisely because this was unverified at write time.
-- **Status:** holding
-- **Notes:** Needs manual verification by the user — connect with `FURHAT_HOST` set, trigger a demo, and confirm by ear that the voice is English (and ideally check logs for the "No English voice found" warning, which would indicate the connected robot's voice list doesn't tag English as expected).
+- **Status:** validated
+- **Notes:** User manually confirmed it works on a connected robot.
+
+### A-006
+- **Cycle:** cycle-004
+- **Assumption:** Plain word-overlap retrieval (no stemming, no embeddings) is good enough to find relevant chunks for realistic Open Day questions.
+- **Rationale:** Chosen to keep this cycle fully offline-testable (no embeddings API calls needed in CI) and simple to reason about. Demonstrated *false* during manual smoke-testing this cycle: "What courses do you offer?" returned the "I don't know" fallback because the placeholder doc used "Bachelor of Science"/"Master of..." rather than the literal word "courses" — fixed for that specific case by editing the placeholder doc, but the underlying brittleness (vocabulary mismatch) is structural, not fixed.
+- **Status:** invalidated (for the general case; works for close vocabulary matches only)
+- **Notes:** See ADR-003. Tracked in `BACKLOG.md` as a "Later" item — move to embeddings/semantic retrieval before this is trusted against real, unedited pamphlet content where question phrasing won't always match source wording.
