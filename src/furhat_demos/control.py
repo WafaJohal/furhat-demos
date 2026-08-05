@@ -15,8 +15,15 @@ class LoggingDemoController:
         logger.info("start_demo requested: demo_id=%s option_id=%s", demo_id, option_id)
 
 
+class VoiceLike(Protocol):
+    name: str
+    language: str | None
+
+
 class RemoteApi(Protocol):
     def say(self, **kwargs: object) -> object: ...
+    def get_voices(self) -> list[VoiceLike]: ...
+    def set_voice(self, name: str) -> object: ...
 
 
 # Placeholder spoken intros — replaced by real RAG/persona logic (Demo 1) and
@@ -39,7 +46,28 @@ _DEFAULT_INTRO = "Hi! Let's get started."
 class FurhatDemoController:
     def __init__(self, remote_api: RemoteApi) -> None:
         self._remote_api = remote_api
+        self._voice_ensured = False
+
+    def _ensure_english_voice(self) -> None:
+        if self._voice_ensured:
+            return
+        self._voice_ensured = True
+        try:
+            voices = self._remote_api.get_voices()
+            english_voice = next(
+                (v for v in voices if v.language and v.language.lower().startswith("en")),
+                None,
+            )
+            if english_voice is None:
+                logger.warning("No English voice found on connected Furhat; leaving voice as-is")
+                return
+            self._remote_api.set_voice(name=english_voice.name)
+        except Exception:
+            logger.warning(
+                "Failed to set an English voice on Furhat; continuing anyway", exc_info=True
+            )
 
     def start_demo(self, demo_id: str, option_id: str) -> None:
+        self._ensure_english_voice()
         text = _INTROS.get((demo_id, option_id), _DEFAULT_INTRO)
         self._remote_api.say(text=text, blocking=False)

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-08-05
+### Added
+- `FurhatDemoController` now ensures an English voice is selected on the
+  connected robot (via `get_voices`/`set_voice`) before it speaks, since
+  language is tied to voice choice rather than a separate `say()` parameter.
+  Selection happens once per controller instance; if no English voice is
+  found or the lookup fails, it logs a warning and speaks anyway rather than
+  blocking the demo.
+
 ## [0.1.2] - 2026-08-05
 ### Added
 - `FurhatDemoController`, a real `DemoController` that speaks a placeholder

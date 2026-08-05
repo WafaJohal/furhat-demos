@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "furhat-demos"
-version = "0.1.2"
+version = "0.1.3"
 description = "Furhat robot demos for University of Melbourne Open Day: LLM Q&A personas and FaceVis data visualization"
 readme = "README.md"
 requires-python = ">=3.10"
