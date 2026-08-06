@@ -2,7 +2,7 @@
 
 ![CI](https://github.com/WafaJohal/furhat-demos/actions/workflows/ci.yml/badge.svg)
 ![coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
-![version](https://img.shields.io/badge/version-0.1.5-blue)
+![version](https://img.shields.io/badge/version-0.1.6-blue)
 
 Two Furhat robot demos for University of Melbourne, School of Computing and Information Systems:
 
@@ -26,13 +26,11 @@ Both demos are driven by an **external Python control plane** talking to the rob
 `DemoController` has two implementations, selected by the `FURHAT_HOST` environment variable:
 
 - Unset (default) — `LoggingDemoController`, which just logs the selection. Used for local UI development with no robot connected.
-- Set to a host (e.g. `localhost` for Furhat Virtual, or the robot's IP) — `FurhatDemoController`, which connects via `furhat_remote_api`, ensures an English voice is selected (language is tied to voice choice in Furhat's API), and has the robot speak a placeholder intro for the selected demo/option.
+- Set to a host (e.g. `localhost` for Furhat Virtual, or the robot's IP) — `FurhatDemoController`, which connects via `furhat_remote_api`, ensures an English voice is selected (language is tied to voice choice in Furhat's API), speaks an intro for the selected demo/option, and — for the opendemo demos, when `OPENAI_API_KEY` is also set — listens once for a question, answers it via that persona's `QAEngine`, and speaks the answer. One question per button press, not an ongoing conversation (see `BACKLOG.md`). If the robot is unreachable, the web UI's `/api/select` returns a clean `503` rather than an unhandled-exception traceback.
 
-The spoken intros are still placeholders — persona-specific prompts, wiring into the web UI, and FaceVis logic (Demo 2) land in upcoming cycles.
+Demo 1's Q&A core is `furhat_demos.opendemo.QAEngine`: it retrieves relevant chunks by word-overlap scoring, then answers via an injected `LLMClient` (`OpenAIChatClient` for real use, needs `OPENAI_API_KEY`) — or returns a fixed "I don't know" style response without calling the LLM at all when nothing relevant is found. `furhat_demos.opendemo.personas.build_qa_engine(persona_id, llm_client)` builds one per persona: `guide` uses the general Handbook content; `wafa-johal` uses Handbook content plus a dedicated bio doc (`data/personas/wafa-johal.md` — the Handbook doesn't cover individual researchers), with her own system prompt.
 
-Demo 1's Q&A core exists as a standalone module, `furhat_demos.opendemo.QAEngine`: it retrieves relevant chunks from Open Day/curriculum docs (`src/furhat_demos/opendemo/data/`) by word-overlap scoring, then answers via an injected `LLMClient` (`OpenAIChatClient` for real use, needs `OPENAI_API_KEY`) — or returns a fixed "I don't know" style response without calling the LLM at all when nothing relevant is found. Not yet wired to the web UI or robot speech/listening.
-
-The content in `data/` is real University of Melbourne Handbook material (handbook.unimelb.edu.au), cached ahead of time — run `python scripts/ingest_handbook.py` to (re)generate it. The live demo never calls the Handbook site itself, only this local cache. Currently covers a small representative set (Diploma in Computing, Foundations of Computing, Algorithms and Data Structures); expand `PAGES` in that script to broaden coverage.
+The general content in `data/` is real University of Melbourne Handbook material (handbook.unimelb.edu.au), cached ahead of time — run `python scripts/ingest_handbook.py` to (re)generate it. The live demo never calls the Handbook site itself, only this local cache. Currently covers a small representative set (Diploma in Computing, Foundations of Computing, Algorithms and Data Structures); expand `PAGES` in that script to broaden coverage.
 
 See `docs/adr/` for the recorded reasoning behind this and other architectural decisions as they're made.
 

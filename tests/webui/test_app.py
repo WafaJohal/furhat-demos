@@ -60,3 +60,18 @@ def test_default_controller_is_used_when_none_passed():
     client = TestClient(app)
     res = client.post("/api/select", json={"demo_id": "facevis", "option_id": "air-quality"})
     assert res.status_code == 200
+
+
+class RaisingController:
+    def start_demo(self, demo_id: str, option_id: str) -> None:
+        raise ConnectionError("No route to host")
+
+
+def test_select_returns_503_when_controller_raises():
+    app = create_app(controller=RaisingController())
+    client = TestClient(app, raise_server_exceptions=False)
+
+    res = client.post("/api/select", json={"demo_id": "opendemo", "option_id": "guide"})
+
+    assert res.status_code == 503
+    assert "robot" in res.json()["detail"].lower()

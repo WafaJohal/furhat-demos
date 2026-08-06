@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-08-06
+### Added
+- `FurhatDemoController` now runs a live, single-turn Q&A round on the
+  opendemo option: after its intro (now spoken with `blocking=True` so
+  `listen()` doesn't pick up the tail of its own speech), it listens once
+  for a question, answers via that persona's `QAEngine`, and speaks the
+  answer. `SILENCE`/`INTERRUPTED`/`FAILED`/empty listen results get a
+  graceful spoken fallback instead of a nonsense LLM call.
+- `furhat_demos.opendemo.personas`: builds a persona-specific `QAEngine` —
+  `guide` uses the general Handbook content; `wafa-johal` uses Handbook
+  content plus a dedicated bio doc (the Handbook doesn't cover individual
+  researchers), with her own first-person system prompt.
+- `build_controller()` now wires in a real `OpenAIChatClient` when
+  `OPENAI_API_KEY` is set; left unset, the opendemo Q&A turn is skipped
+  (intro-only), matching prior behavior.
+- The web UI's `/api/select` now catches any `DemoController` failure
+  (e.g. the robot being unreachable) and returns a clean `503` instead of
+  an unhandled-exception traceback.
+
+### Known limitation
+- Still single-turn — one question per button press, not an ongoing
+  conversation. Tracked in `BACKLOG.md`.
+
 ## [0.1.5] - 2026-08-06
 ### Added
 - `furhat_demos.opendemo.handbook`: fetch + parse University of Melbourne
