@@ -58,3 +58,10 @@ Each entry:
 - **Rationale:** Chosen to keep this cycle fully offline-testable (no embeddings API calls needed in CI) and simple to reason about. Demonstrated *false* during manual smoke-testing this cycle: "What courses do you offer?" returned the "I don't know" fallback because the placeholder doc used "Bachelor of Science"/"Master of..." rather than the literal word "courses" — fixed for that specific case by editing the placeholder doc, but the underlying brittleness (vocabulary mismatch) is structural, not fixed.
 - **Status:** invalidated (for the general case; works for close vocabulary matches only)
 - **Notes:** See ADR-003. Tracked in `BACKLOG.md` as a "Later" item — move to embeddings/semantic retrieval before this is trusted against real, unedited pamphlet content where question phrasing won't always match source wording.
+
+### A-007
+- **Cycle:** cycle-005
+- **Assumption:** The Handbook site's HTML structure (CSS class names like `search-result-item__anchor`, the `#main-content`/`.layout-sidebar__side` layout used to strip nav/sidebar boilerplate) stays stable enough that `furhat_demos.opendemo.handbook`'s parsers keep working without maintenance.
+- **Rationale:** Parsers were written against real pages fetched 2026-08-06 and are tested only against saved fixtures from that date — there's no live contract with the Handbook site, just observed structure. A redesign of the site would silently break parsing (likely returning empty/garbled text rather than an obvious error).
+- **Status:** holding
+- **Notes:** Also flagging a related, lower-severity issue found during this cycle: ingested chunks are coarse (whole-page, not split by section — the source pages don't have blank-line boundaries between subsections) and carry breadcrumb/nav text at the top of each chunk. Both are content-quality issues, not correctness bugs; tracked in `BACKLOG.md`.

@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-08-06
+### Added
+- `furhat_demos.opendemo.handbook`: fetch + parse University of Melbourne
+  Handbook search results and subject/course detail pages
+  (handbook.unimelb.edu.au) into clean text, via an injectable HTTP client.
+- `scripts/ingest_handbook.py`: offline CLI that caches a curated set of
+  Handbook pages as markdown into `src/furhat_demos/opendemo/data/` — the
+  live demo reads only this cache, never the Handbook site directly.
+
+### Changed
+- Replaced the 3 hand-written placeholder Open Day docs with real,
+  ingested Handbook content (Diploma in Computing, Foundations of
+  Computing, Algorithms and Data Structures) as a first representative set.
+
+### Known limitations
+- Ingested chunks are coarse (whole-page, not split by section) and carry
+  some breadcrumb/nav boilerplate — see `BACKLOG.md`.
+
 ## [0.1.4] - 2026-08-05
 ### Added
 - `QAEngine` (`furhat_demos.opendemo.qa`): a retrieval-grounded Q&A core for

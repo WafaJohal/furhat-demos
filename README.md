@@ -2,7 +2,7 @@
 
 ![CI](https://github.com/WafaJohal/furhat-demos/actions/workflows/ci.yml/badge.svg)
 ![coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
-![version](https://img.shields.io/badge/version-0.1.4-blue)
+![version](https://img.shields.io/badge/version-0.1.5-blue)
 
 Two Furhat robot demos for University of Melbourne, School of Computing and Information Systems:
 
@@ -30,7 +30,9 @@ Both demos are driven by an **external Python control plane** talking to the rob
 
 The spoken intros are still placeholders — persona-specific prompts, wiring into the web UI, and FaceVis logic (Demo 2) land in upcoming cycles.
 
-Demo 1's Q&A core exists as a standalone module, `furhat_demos.opendemo.QAEngine`: it retrieves relevant chunks from placeholder Open Day/curriculum docs (`src/furhat_demos/opendemo/data/`) by word-overlap scoring, then answers via an injected `LLMClient` (`OpenAIChatClient` for real use, needs `OPENAI_API_KEY`) — or returns a fixed "I don't know" style response without calling the LLM at all when nothing relevant is found. Not yet wired to the web UI or robot speech/listening.
+Demo 1's Q&A core exists as a standalone module, `furhat_demos.opendemo.QAEngine`: it retrieves relevant chunks from Open Day/curriculum docs (`src/furhat_demos/opendemo/data/`) by word-overlap scoring, then answers via an injected `LLMClient` (`OpenAIChatClient` for real use, needs `OPENAI_API_KEY`) — or returns a fixed "I don't know" style response without calling the LLM at all when nothing relevant is found. Not yet wired to the web UI or robot speech/listening.
+
+The content in `data/` is real University of Melbourne Handbook material (handbook.unimelb.edu.au), cached ahead of time — run `python scripts/ingest_handbook.py` to (re)generate it. The live demo never calls the Handbook site itself, only this local cache. Currently covers a small representative set (Diploma in Computing, Foundations of Computing, Algorithms and Data Structures); expand `PAGES` in that script to broaden coverage.
 
 See `docs/adr/` for the recorded reasoning behind this and other architectural decisions as they're made.
 
