@@ -5,10 +5,19 @@ import os
 from furhat_remote_api import FurhatRemoteAPI
 
 from furhat_demos.control import DemoController, FurhatDemoController, LoggingDemoController
-from furhat_demos.opendemo.llm_client import OpenAIChatClient
+from furhat_demos.opendemo.llm_client import LLMClient, OpenAIChatClient
 
 FURHAT_HOST_ENV_VAR = "FURHAT_HOST"
 OPENAI_API_KEY_ENV_VAR = "OPENAI_API_KEY"
+
+
+def build_llm_client() -> LLMClient | None:
+    """Build an OpenAIChatClient when OPENAI_API_KEY is set, else None.
+
+    A None LLMClient means FurhatDemoController skips the listen-and-answer
+    step on the opendemo demo (intro only).
+    """
+    return OpenAIChatClient() if os.environ.get(OPENAI_API_KEY_ENV_VAR) else None
 
 
 def build_controller() -> DemoController:
@@ -25,5 +34,4 @@ def build_controller() -> DemoController:
     host = os.environ.get(FURHAT_HOST_ENV_VAR)
     if not host:
         return LoggingDemoController()
-    llm_client = OpenAIChatClient() if os.environ.get(OPENAI_API_KEY_ENV_VAR) else None
-    return FurhatDemoController(FurhatRemoteAPI(host), llm_client=llm_client)
+    return FurhatDemoController(FurhatRemoteAPI(host), llm_client=build_llm_client())

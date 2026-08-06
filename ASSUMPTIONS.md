@@ -72,3 +72,10 @@ Each entry:
 - **Rationale:** No live Furhat/Furhat Virtual instance in this environment to test the `listen()` path — only mocked in tests (`FakeRemoteApi.listen()` returning a canned `FakeListenResult`). Real speech recognition quality/latency/timeout behavior is unverified.
 - **Status:** holding
 - **Notes:** Needs manual verification by the user against a real connection — including whether blocking the intro (`say(..., blocking=True)`) actually prevents `listen()` from picking up the tail of the robot's own speech as intended.
+
+### A-009
+- **Cycle:** cycle-007
+- **Assumption:** 5 seconds (`PROBE_DEADLINE_SECONDS`) is long enough for a genuinely-connecting-but-slow robot (e.g. on a congested Wi-Fi network) to respond, so the hard connect deadline doesn't produce false "not connected" reports for a robot that would have worked given a bit more time.
+- **Rationale:** Chosen based on this cycle's real finding that the underlying HTTP client's internal retries mean an *unreachable* host can hang 10s+ without a hard cap — 5s balances "fail fast enough to be usable" against "don't be so aggressive it misjudges a slow-but-real connection." Not validated against an actual slow/congested network, only against a fast local network and a deliberately-unreachable test IP.
+- **Status:** holding
+- **Notes:** If real-world testing shows the robot's network is often slow enough to need more than 5s, `probe_deadline_seconds` is a constructor parameter on `RobotConnection` and easy to increase.
