@@ -40,6 +40,24 @@ _NO_QUESTION_HEARD = (
     "Sorry, I didn't catch a question there — feel free to come back and try again!"
 )
 
+_MAX_QA_TURNS = 10
+
+_EXIT_PHRASES = (
+    "goodbye",
+    "bye",
+    "no more questions",
+    "that's all",
+    "i'm done",
+    "stop asking",
+)
+
+_GOODBYE = "Thanks for chatting with me! Come back any time you have more questions."
+
+
+def _is_exit_phrase(question: str) -> bool:
+    lowered = question.lower()
+    return any(phrase in lowered for phrase in _EXIT_PHRASES)
+
 
 # Placeholder spoken intros — replaced by real RAG/persona logic (Demo 1) and
 # FaceVis logic (Demo 2) in later cycles. Keyed by (demo_id, option_id).
@@ -91,14 +109,23 @@ class FurhatDemoController:
         # the tail of the robot's own intro speech as the visitor's question.
         self._remote_api.say(text=text, blocking=will_run_qa_turn)
         if will_run_qa_turn:
-            self._run_single_qa_turn(option_id)
+            self._run_qa_loop(option_id)
 
-    def _run_single_qa_turn(self, option_id: str) -> None:
-        result = self._remote_api.listen()
-        question = getattr(result, "message", None)
-        if question in _LISTEN_SENTINELS:
-            self._remote_api.say(text=_NO_QUESTION_HEARD, blocking=False)
-            return
+    def _run_qa_loop(self, option_id: str) -> None:
         engine = build_qa_engine(option_id, self._llm_client)
-        answer = engine.answer(question)
-        self._remote_api.say(text=answer, blocking=False)
+        consecutive_silences = 0
+        for _ in range(_MAX_QA_TURNS):
+            result = self._remote_api.listen()
+            question = getattr(result, "message", None)
+            if question in _LISTEN_SENTINELS:
+                consecutive_silences += 1
+                if consecutive_silences >= 2:
+                    break
+                self._remote_api.say(text=_NO_QUESTION_HEARD, blocking=True)
+                continue
+            consecutive_silences = 0
+            if _is_exit_phrase(question):
+                break
+            answer = engine.answer(question)
+            self._remote_api.say(text=answer, blocking=True)
+        self._remote_api.say(text=_GOODBYE, blocking=False)

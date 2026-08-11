@@ -3,11 +3,10 @@
 A living list of planned, in-progress, and completed work. Reviewed at the end of every cycle (on each version bump): mark delivered items done, and capture newly discovered work.
 
 ## Now (in progress)
-<!-- Items being actively worked in the current cycle -->
+- chore: real-robot testing — user is testing the connection panel against Furhat Virtual this week; real-robot + auth testing resumes next week (see A-010)
 
 ## Next (planned)
-- chore: manually verify the robot connection panel (`/api/robot/connect`) and the live opendemo Q&A turn (listen → answer → say) against the real robot/Furhat Virtual — this environment has no live Furhat to test either path against, only mocked/simulated (an unreachable test IP) in tests
-- feat: continuous/multi-question loop for the opendemo Q&A turn instead of one question per button press
+- feat: support an authentication key on the robot connection (user's hypothesis, from real-robot testing: the Remote API Skill may require one). **Not yet confirmed or implemented** — `furhat_remote_api`'s generated client has no built-in auth mechanism at all (`Configuration.auth_settings()` returns `{}`, unused `api_key`/`api_key_prefix` fields are dead codegen boilerplate), so this would need a custom header added ourselves. Needs the actual error/requirement confirmed against a real robot with the Remote API Skill running before building — see A-010.
 - feat: expand `PAGES` in `scripts/ingest_handbook.py` to cover the full set of relevant CIS courses/subjects, not just the 3-page representative set (Diploma in Computing, COMP10001, COMP20003)
 - feat: Demo 2 — FaceVis data-viz demo connected to a live Melbourne/Victoria dataset
 
@@ -18,8 +17,10 @@ A living list of planned, in-progress, and completed work. Reviewed at the end o
 - Demo 1: expand persona roster beyond initial set (more students/group members)
 - Consider whether the web UI needs to run reachable over LAN / survive a reboot for the actual event setup (currently local-only, dev-server style)
 - No auth on `/api/robot/connect`/`/api/robot/status` — acceptable for a local/LAN kiosk tool, revisit if this ever needs to be reachable beyond that
+- The exit-phrase list for ending the Q&A loop is a coarse heuristic (e.g. "thanks" was deliberately left out to avoid false-triggering on "thanks, and also...") — revisit if real usage shows it's mis-ending or not ending when it should
 
 ## Done
+- feat: continuous multi-question Q&A loop for the opendemo demo (was one question per button press) — exit phrase, double-silence, or 10-turn cap all end the loop with a goodbye — shipped v0.1.8 (cycle-008)
 - feat: robot connection panel in the web UI — enter an IP, see live status, backed by mutable `RobotConnection` runtime state instead of a fixed startup controller; hard 5s connect deadline independent of the Furhat client's internal retries (found via real testing — see ADR-006) — shipped v0.1.7 (cycle-007)
 - feat: live single-turn Q&A on the opendemo option (listen → persona `QAEngine` → say), persona-specific prompts/content, and a clean `503` instead of a raw traceback when the robot is unreachable — shipped v0.1.6 (cycle-006)
 - feat: Handbook ingestion pipeline (`furhat_demos.opendemo.handbook`, `scripts/ingest_handbook.py`) — real UniMelb Handbook content replaces the 3 placeholder docs — shipped v0.1.5 (cycle-005)

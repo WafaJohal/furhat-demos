@@ -79,3 +79,17 @@ Each entry:
 - **Rationale:** Chosen based on this cycle's real finding that the underlying HTTP client's internal retries mean an *unreachable* host can hang 10s+ without a hard cap — 5s balances "fail fast enough to be usable" against "don't be so aggressive it misjudges a slow-but-real connection." Not validated against an actual slow/congested network, only against a fast local network and a deliberately-unreachable test IP.
 - **Status:** holding
 - **Notes:** If real-world testing shows the robot's network is often slow enough to need more than 5s, `probe_deadline_seconds` is a constructor parameter on `RobotConnection` and easy to increase.
+
+### A-010
+- **Cycle:** cycle-007 (development, post-merge)
+- **Assumption:** Once the Furhat Remote API Skill is actually running on the robot, `RobotConnection.connect()` will succeed without needing an authentication key.
+- **Rationale:** Real-robot testing (2026-08-06) found `curl` to the robot's IP:54321 got "Connection refused" (host reachable, nothing listening) rather than "No route to host" — diagnosed as the Remote API Skill not currently running on the robot, not a network or code issue. Separately, the user raised that an auth key may be needed. Checked: `furhat_remote_api`'s generated client has **no built-in auth mechanism at all** — `Configuration.auth_settings()` returns `{}`; the `api_key`/`api_key_prefix` fields present on `Configuration` are unused swagger-codegen boilerplate. If a key is genuinely required, it would need a custom HTTP header added ourselves — not yet built, pending confirmation.
+- **Status:** holding
+- **Notes:** Deferred to next week per the user — real-robot testing (with the Remote API Skill confirmed running) will show whether a connection actually needs a key (e.g. a 401/403 response) before any auth-key support is designed or built. Building it speculatively now risks guessing at the wrong mechanism.
+
+### A-011
+- **Cycle:** cycle-008
+- **Assumption:** The exit-phrase heuristic (`"bye"`, `"goodbye"`, `"stop asking"`, etc. as a case-insensitive substring match) correctly identifies when a real visitor wants to end the Q&A loop, without frequently mis-firing (ending mid-question) or failing to fire (visitor says something like "thanks" and walks away, loop doesn't end until the double-silence/max-turn fallback).
+- **Rationale:** This is a fixed keyword list, not a language model — deliberately simple (see ADR-007) and untested against real speech-recognition output, which can be noisy/partial in ways clean text fixtures aren't.
+- **Status:** holding
+- **Notes:** Needs manual verification once the live `listen()` path itself is verified (see A-008) — watch for both false-ends (cut off mid-question) and failure-to-end (visitor leaves, loop just times out via double-silence/max-turn instead of responding to a clear goodbye).

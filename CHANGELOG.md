@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-08-10
+### Added
+- `FurhatDemoController`'s opendemo Q&A turn is now a continuous multi-question
+  loop instead of one question per button press: keeps listening and
+  answering until an exit phrase ("bye", "goodbye", "stop asking", etc.), two
+  consecutive silences, or a 10-turn safety cap, then says a goodbye line.
+  A single silence gets one spoken nudge and the loop continues.
+
 ## [0.1.7] - 2026-08-06
 ### Added
 - Web UI: a "Robot connection" panel to enter the robot's IP and see live

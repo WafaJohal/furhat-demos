@@ -1,8 +1,8 @@
 import logging
 from dataclasses import dataclass, field
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
-from furhat_demos.control import FurhatDemoController, LoggingDemoController
+from furhat_demos.control import _MAX_QA_TURNS, FurhatDemoController, LoggingDemoController
 
 
 def test_logging_demo_controller_logs(caplog):
@@ -30,7 +30,7 @@ class FakeRemoteApi:
     calls: list[dict] = field(default_factory=list)
     set_voice_calls: list[str] = field(default_factory=list)
     voices_error: Exception | None = None
-    listen_result: FakeListenResult | None = None
+    listen_results: list[FakeListenResult] = field(default_factory=list)
     listen_call_count: int = 0
 
     def say(self, **kwargs):
@@ -46,7 +46,9 @@ class FakeRemoteApi:
 
     def listen(self):
         self.listen_call_count += 1
-        return self.listen_result
+        if self.listen_call_count <= len(self.listen_results):
+            return self.listen_results[self.listen_call_count - 1]
+        return FakeListenResult(message="SILENCE")
 
 
 class FakeLLMClient:
@@ -133,27 +135,8 @@ def test_furhat_demo_controller_warns_and_continues_when_voice_lookup_fails(capl
     assert "Failed to set an English voice" in caplog.text
 
 
-def test_furhat_demo_controller_runs_qa_turn_after_intro_when_llm_client_set():
-    fake = FakeRemoteApi(listen_result=FakeListenResult(message="What is COMP10001?"))
-    llm = FakeLLMClient()
-    controller = FurhatDemoController(fake, llm_client=llm)
-
-    fake_engine = MagicMock()
-    fake_engine.answer.return_value = "It's an intro programming subject."
-
-    with patch("furhat_demos.control.build_qa_engine", return_value=fake_engine) as mock_build:
-        controller.start_demo("opendemo", "guide")
-
-    mock_build.assert_called_once_with("guide", llm)
-    fake_engine.answer.assert_called_once_with("What is COMP10001?")
-    assert fake.listen_call_count == 1
-    assert len(fake.calls) == 2
-    assert fake.calls[0]["blocking"] is True  # intro blocks so listen() doesn't hear itself
-    assert fake.calls[1] == {"text": "It's an intro programming subject.", "blocking": False}
-
-
 def test_furhat_demo_controller_skips_qa_turn_without_llm_client():
-    fake = FakeRemoteApi(listen_result=FakeListenResult(message="What is COMP10001?"))
+    fake = FakeRemoteApi(listen_results=[FakeListenResult(message="What is COMP10001?")])
     controller = FurhatDemoController(fake)
 
     with patch("furhat_demos.control.build_qa_engine") as mock_build:
@@ -166,7 +149,7 @@ def test_furhat_demo_controller_skips_qa_turn_without_llm_client():
 
 
 def test_furhat_demo_controller_skips_qa_turn_for_non_opendemo():
-    fake = FakeRemoteApi(listen_result=FakeListenResult(message="irrelevant"))
+    fake = FakeRemoteApi(listen_results=[FakeListenResult(message="irrelevant")])
     llm = FakeLLMClient()
     controller = FurhatDemoController(fake, llm_client=llm)
 
@@ -179,28 +162,111 @@ def test_furhat_demo_controller_skips_qa_turn_for_non_opendemo():
     assert fake.calls[0]["blocking"] is False
 
 
-def test_furhat_demo_controller_speaks_fallback_when_no_question_heard():
-    fake = FakeRemoteApi(listen_result=FakeListenResult(message="SILENCE"))
+def test_furhat_demo_controller_answers_then_exits_on_exit_phrase():
+    fake = FakeRemoteApi(
+        listen_results=[
+            FakeListenResult(message="What is COMP10001?"),
+            FakeListenResult(message="bye"),
+        ]
+    )
     llm = FakeLLMClient()
     controller = FurhatDemoController(fake, llm_client=llm)
 
-    with patch("furhat_demos.control.build_qa_engine") as mock_build:
+    fake_engine = MagicMock()
+    fake_engine.answer.return_value = "It's an intro programming subject."
+
+    with patch("furhat_demos.control.build_qa_engine", return_value=fake_engine) as mock_build:
         controller.start_demo("opendemo", "guide")
 
-    mock_build.assert_not_called()
-    assert len(fake.calls) == 2
-    assert "didn't catch a question" in fake.calls[1]["text"]
-    assert fake.calls[1]["blocking"] is False
+    mock_build.assert_called_once_with("guide", llm)
+    fake_engine.answer.assert_called_once_with("What is COMP10001?")
+    assert fake.listen_call_count == 2
+    assert len(fake.calls) == 3
+    assert fake.calls[0]["blocking"] is True  # intro blocks so listen() doesn't hear itself
+    assert fake.calls[1] == {"text": "It's an intro programming subject.", "blocking": True}
+    assert "Thanks for chatting" in fake.calls[2]["text"]
+    assert fake.calls[2]["blocking"] is False
 
 
-def test_furhat_demo_controller_speaks_fallback_when_listen_returns_none_message():
-    fake = FakeRemoteApi(listen_result=FakeListenResult(message=None))
+def test_furhat_demo_controller_answers_multiple_questions_in_one_loop():
+    fake = FakeRemoteApi(
+        listen_results=[
+            FakeListenResult(message="question one"),
+            FakeListenResult(message="question two"),
+            FakeListenResult(message="goodbye"),
+        ]
+    )
     llm = FakeLLMClient()
     controller = FurhatDemoController(fake, llm_client=llm)
 
-    with patch("furhat_demos.control.build_qa_engine") as mock_build:
+    fake_engine = MagicMock()
+    fake_engine.answer.side_effect = ["answer one", "answer two"]
+
+    with patch("furhat_demos.control.build_qa_engine", return_value=fake_engine):
         controller.start_demo("opendemo", "guide")
 
-    mock_build.assert_not_called()
-    assert len(fake.calls) == 2
-    assert "didn't catch a question" in fake.calls[1]["text"]
+    assert fake_engine.answer.call_args_list == [call("question one"), call("question two")]
+    spoken_texts = [c["text"] for c in fake.calls]
+    assert "answer one" in spoken_texts
+    assert "answer two" in spoken_texts
+    assert "Thanks for chatting" in spoken_texts[-1]
+
+
+def test_furhat_demo_controller_nudges_once_on_single_silence_then_continues():
+    fake = FakeRemoteApi(
+        listen_results=[
+            FakeListenResult(message="SILENCE"),
+            FakeListenResult(message="a real question"),
+            FakeListenResult(message="bye"),
+        ]
+    )
+    llm = FakeLLMClient()
+    controller = FurhatDemoController(fake, llm_client=llm)
+
+    fake_engine = MagicMock()
+    fake_engine.answer.return_value = "an answer"
+
+    with patch("furhat_demos.control.build_qa_engine", return_value=fake_engine):
+        controller.start_demo("opendemo", "guide")
+
+    spoken_texts = [c["text"] for c in fake.calls]
+    assert sum("didn't catch a question" in t for t in spoken_texts) == 1
+    assert "an answer" in spoken_texts
+    assert fake.listen_call_count == 3
+
+
+def test_furhat_demo_controller_ends_loop_after_two_consecutive_silences():
+    fake = FakeRemoteApi(
+        listen_results=[
+            FakeListenResult(message="SILENCE"),
+            FakeListenResult(message="SILENCE"),
+        ]
+    )
+    llm = FakeLLMClient()
+    controller = FurhatDemoController(fake, llm_client=llm)
+
+    with patch("furhat_demos.control.build_qa_engine"):
+        controller.start_demo("opendemo", "guide")
+
+    assert fake.listen_call_count == 2
+    spoken_texts = [c["text"] for c in fake.calls]
+    assert sum("didn't catch a question" in t for t in spoken_texts) == 1
+    assert "Thanks for chatting" in spoken_texts[-1]
+
+
+def test_furhat_demo_controller_stops_after_max_turns():
+    fake = FakeRemoteApi(
+        listen_results=[FakeListenResult(message=f"question {i}") for i in range(_MAX_QA_TURNS + 5)]
+    )
+    llm = FakeLLMClient()
+    controller = FurhatDemoController(fake, llm_client=llm)
+
+    fake_engine = MagicMock()
+    fake_engine.answer.return_value = "an answer"
+
+    with patch("furhat_demos.control.build_qa_engine", return_value=fake_engine):
+        controller.start_demo("opendemo", "guide")
+
+    assert fake.listen_call_count == _MAX_QA_TURNS
+    assert fake_engine.answer.call_count == _MAX_QA_TURNS
+    assert "Thanks for chatting" in fake.calls[-1]["text"]
