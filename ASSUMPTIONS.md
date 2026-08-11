@@ -29,7 +29,7 @@ Each entry:
 - **Assumption:** A physical Furhat robot will be available and network-reachable for testing during development (not only Furhat Virtual).
 - **Rationale:** User confirmed access to a physical unit. No longer tied to camera-feed work specifically (QR dropped, see A-001), but still relevant once a real `DemoController` drives the robot via Remote/Realtime API in upcoming cycles.
 - **Status:** holding
-- **Notes:** If the physical robot becomes unavailable, live robot-control work would stall until access is restored; Furhat Virtual can stand in for control-API testing (speech, gestures, persona) in the meantime.
+- **Notes:** If the physical robot becomes unavailable, live robot-control work would stall until access is restored; Furhat Virtual can stand in for control-API testing (speech, gestures, persona) in the meantime. Observed directly during cycle-006 testing: user hit a "No route to host" error connecting to the robot's IP (likely a hotspot-network routing issue on the test machine, not a code bug) — motivated the cycle-006 addition of a clean `503` response instead of a raw traceback when this happens.
 
 ### A-003
 - **Cycle:** cycle-001 (setup)
@@ -65,3 +65,10 @@ Each entry:
 - **Rationale:** Parsers were written against real pages fetched 2026-08-06 and are tested only against saved fixtures from that date — there's no live contract with the Handbook site, just observed structure. A redesign of the site would silently break parsing (likely returning empty/garbled text rather than an obvious error).
 - **Status:** holding
 - **Notes:** Also flagging a related, lower-severity issue found during this cycle: ingested chunks are coarse (whole-page, not split by section — the source pages don't have blank-line boundaries between subsections) and carry breadcrumb/nav text at the top of each chunk. Both are content-quality issues, not correctness bugs; tracked in `BACKLOG.md`.
+
+### A-008
+- **Cycle:** cycle-006
+- **Assumption:** `remote_api.listen()`'s real behavior (blocking until speech or timeout, `Status.message` containing recognized text or one of `SILENCE`/`INTERRUPTED`/`FAILED`) matches Furhat's documented behavior closely enough for `FurhatDemoController._run_single_qa_turn` to work as designed on a real connection.
+- **Rationale:** No live Furhat/Furhat Virtual instance in this environment to test the `listen()` path — only mocked in tests (`FakeRemoteApi.listen()` returning a canned `FakeListenResult`). Real speech recognition quality/latency/timeout behavior is unverified.
+- **Status:** holding
+- **Notes:** Needs manual verification by the user against a real connection — including whether blocking the intro (`say(..., blocking=True)`) actually prevents `listen()` from picking up the tail of the robot's own speech as intended.

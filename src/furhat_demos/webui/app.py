@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -9,6 +10,8 @@ from pydantic import BaseModel
 from furhat_demos.config import build_controller
 from furhat_demos.control import DemoController
 from furhat_demos.webui.demos import DEMOS, find_demo, find_option
+
+logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -44,7 +47,14 @@ def create_app(controller: DemoController | None = None) -> FastAPI:
         option = find_option(demo, selection.option_id)
         if option is None:
             raise HTTPException(status_code=404, detail=f"Unknown option_id: {selection.option_id}")
-        controller.start_demo(demo.id, option.id)
+        try:
+            controller.start_demo(demo.id, option.id)
+        except Exception as exc:
+            logger.exception("start_demo failed for demo_id=%s option_id=%s", demo.id, option.id)
+            raise HTTPException(
+                status_code=503,
+                detail="Could not reach the robot — check it's powered on and reachable.",
+            ) from exc
         return {"status": "ok", "demo_id": demo.id, "option_id": option.id}
 
     app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

@@ -6,8 +6,9 @@ A living list of planned, in-progress, and completed work. Reviewed at the end o
 <!-- Items being actively worked in the current cycle -->
 
 ## Next (planned)
+- chore: manually verify the live opendemo Q&A turn on the real robot/Furhat Virtual (listen → answer → say) — this environment has no live Furhat to test the `listen()` path against, only mocked in tests
+- feat: continuous/multi-question loop for the opendemo Q&A turn instead of one question per button press
 - feat: expand `PAGES` in `scripts/ingest_handbook.py` to cover the full set of relevant CIS courses/subjects, not just the 3-page representative set (Diploma in Computing, COMP10001, COMP20003)
-- feat: persona-specific system prompts for `QAEngine` (generic guide vs Wafa Johal persona), and wire `QAEngine` into `FurhatDemoController`'s opendemo option (text answer → `say()`; consider `listen()` for voice input, which Furhat's Remote API already exposes)
 - feat: Demo 2 — FaceVis data-viz demo connected to a live Melbourne/Victoria dataset
 
 ## Later (ideas / unscheduled)
@@ -18,6 +19,7 @@ A living list of planned, in-progress, and completed work. Reviewed at the end o
 - Consider whether the web UI needs to run reachable over LAN / survive a reboot for the actual event setup (currently local-only, dev-server style)
 
 ## Done
+- feat: live single-turn Q&A on the opendemo option (listen → persona `QAEngine` → say), persona-specific prompts/content, and a clean `503` instead of a raw traceback when the robot is unreachable — shipped v0.1.6 (cycle-006)
 - feat: Handbook ingestion pipeline (`furhat_demos.opendemo.handbook`, `scripts/ingest_handbook.py`) — real UniMelb Handbook content replaces the 3 placeholder docs — shipped v0.1.5 (cycle-005)
 - feat: `QAEngine` — retrieval-grounded Q&A core for Demo 1, with "I don't know" fallback when nothing relevant is found — shipped v0.1.4 (cycle-004)
 - chore: manually verified `FurhatDemoController`'s English-voice selection works on a connected robot — done (cycle-003 follow-up)

@@ -56,10 +56,12 @@ class QAEngine:
         llm_client: LLMClient,
         chunks: list[Chunk] | None = None,
         top_k: int = 3,
+        system_prompt: str = _SYSTEM_PROMPT,
     ) -> None:
         self._llm_client = llm_client
         self._chunks = chunks if chunks is not None else load_chunks()
         self._top_k = top_k
+        self._system_prompt = system_prompt
 
     def _retrieve(self, question: str) -> list[Chunk]:
         question_words = _tokenize(question)
@@ -76,4 +78,4 @@ class QAEngine:
             return NO_MATCH_ANSWER
         context = "\n\n".join(chunk.text for chunk in relevant)
         user_prompt = f"Context:\n{context}\n\nQuestion: {question}"
-        return self._llm_client.chat(system=_SYSTEM_PROMPT, user=user_prompt)
+        return self._llm_client.chat(system=self._system_prompt, user=user_prompt)
