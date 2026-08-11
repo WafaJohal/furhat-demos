@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from furhat_demos.config import build_controller
+from furhat_demos.config import FURHAT_HOST_ENV_VAR
 from furhat_demos.control import DemoController
 from furhat_demos.webui.demos import DEMOS, find_demo, find_option
+from furhat_demos.webui.robot_connection import RobotConnection
 
 logger = logging.getLogger(__name__)
 
@@ -21,8 +23,20 @@ class SelectionRequest(BaseModel):
     option_id: str
 
 
-def create_app(controller: DemoController | None = None) -> FastAPI:
-    controller = controller or build_controller()
+class ConnectRequest(BaseModel):
+    host: str
+
+
+def create_app(
+    controller: DemoController | None = None,
+    connection: RobotConnection | None = None,
+) -> FastAPI:
+    connection = connection or RobotConnection()
+    if controller is not None:
+        connection.controller = controller
+    elif os.environ.get(FURHAT_HOST_ENV_VAR):
+        connection.connect(os.environ[FURHAT_HOST_ENV_VAR])
+
     app = FastAPI(title="Furhat Demos")
 
     @app.get("/api/demos")
@@ -48,7 +62,7 @@ def create_app(controller: DemoController | None = None) -> FastAPI:
         if option is None:
             raise HTTPException(status_code=404, detail=f"Unknown option_id: {selection.option_id}")
         try:
-            controller.start_demo(demo.id, option.id)
+            connection.controller.start_demo(demo.id, option.id)
         except Exception as exc:
             logger.exception("start_demo failed for demo_id=%s option_id=%s", demo.id, option.id)
             raise HTTPException(
@@ -56,6 +70,23 @@ def create_app(controller: DemoController | None = None) -> FastAPI:
                 detail="Could not reach the robot — check it's powered on and reachable.",
             ) from exc
         return {"status": "ok", "demo_id": demo.id, "option_id": option.id}
+
+    @app.post("/api/robot/connect")
+    def connect_robot(request: ConnectRequest):
+        state = connection.connect(request.host)
+        if not state.connected:
+            raise HTTPException(status_code=502, detail=state.error or "Could not connect.")
+        return {"host": state.host, "connected": state.connected}
+
+    @app.get("/api/robot/status")
+    def robot_status():
+        state = connection.state
+        return {
+            "host": state.host,
+            "connected": state.connected,
+            "error": state.error,
+            "checked_at": state.checked_at,
+        }
 
     app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 

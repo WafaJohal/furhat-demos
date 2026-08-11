@@ -28,11 +28,50 @@
     }
     button:hover { background: #eee; }
     #status { margin-top: 1.5rem; font-weight: bold; min-height: 1.5rem; }
+
+    .robot-panel {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .robot-panel input {
+      padding: 0.5rem 0.6rem;
+      border: 1px solid #999;
+      border-radius: 6px;
+      font-size: 1rem;
+      width: 12rem;
+    }
+    .dot {
+      display: inline-block;
+      width: 0.7rem;
+      height: 0.7rem;
+      border-radius: 50%;
+      background: #999;
+      flex-shrink: 0;
+    }
+    .dot.connected { background: #2a9d3f; }
+    .dot.disconnected { background: #c0392b; }
+    #robot-status-text { font-weight: 600; }
+    #robot-error { color: #c0392b; font-size: 0.9rem; width: 100%; }
   </style>
 </head>
 <body>
   <h1>Furhat Demos</h1>
   <p>Pick a demo, then an option, to start it on the robot.</p>
+
+  <div class="robot-panel">
+    <span class="dot" id="robot-dot"></span>
+    <span id="robot-status-text">Checking…</span>
+    <input id="robot-host" type="text" placeholder="Robot IP, e.g. 172.20.10.10" />
+    <button id="robot-connect-btn">Connect</button>
+    <span id="robot-error"></span>
+  </div>
+
   <div id="demos"></div>
   <div id="status"></div>
 
@@ -87,7 +126,54 @@
       }
     }
 
+    function renderRobotStatus(state) {
+      const dot = document.getElementById('robot-dot');
+      const text = document.getElementById('robot-status-text');
+      const error = document.getElementById('robot-error');
+      dot.className = 'dot ' + (state.connected ? 'connected' : 'disconnected');
+      text.textContent = state.connected
+        ? `Connected to ${state.host}`
+        : (state.host ? `Not connected to ${state.host}` : 'Not connected');
+      error.textContent = state.connected ? '' : (state.error || '');
+    }
+
+    async function refreshRobotStatus() {
+      try {
+        const res = await fetch('/api/robot/status');
+        renderRobotStatus(await res.json());
+      } catch (err) {
+        // Leave the last known status showing rather than clearing it.
+      }
+    }
+
+    async function connectRobot() {
+      const hostInput = document.getElementById('robot-host');
+      const host = hostInput.value.trim();
+      if (!host) return;
+      document.getElementById('robot-status-text').textContent = 'Connecting…';
+      try {
+        const res = await fetch('/api/robot/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ host }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          renderRobotStatus({ connected: false, host, error: data.detail });
+          return;
+        }
+      } catch (err) {
+        renderRobotStatus({ connected: false, host, error: 'Request failed.' });
+        return;
+      }
+      await refreshRobotStatus();
+    }
+
+    document.getElementById('robot-connect-btn').addEventListener('click', connectRobot);
+
     loadDemos();
+    refreshRobotStatus();
+    setInterval(refreshRobotStatus, 10000);
   </script>
 </body>
 </html>

@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-08-06
+### Added
+- Web UI: a "Robot connection" panel to enter the robot's IP and see live
+  connection status (●Connected / ●Not connected, with the error shown),
+  polling `/api/robot/status` every 10s.
+- `POST /api/robot/connect` (body: `{"host": "..."}`) and `GET
+  /api/robot/status` — the app's active `DemoController` is now mutable
+  runtime state (`furhat_demos.webui.robot_connection.RobotConnection`)
+  instead of fixed once at startup; `/api/select` always uses whichever
+  controller is currently connected.
+- `FURHAT_HOST` still works exactly as before as the startup default; this
+  adds a runtime override on top, it doesn't replace it.
+
+### Fixed
+- The connectivity probe now enforces its own hard wall-clock deadline
+  (5s), independent of the Furhat Remote API client's internal retry
+  behavior. Real-world testing found `_request_timeout` alone doesn't
+  bound total latency — the client retries a failed connection attempt
+  ~3 times internally, so an unreachable-but-not-actively-refusing host
+  could hang ~10s+ rather than the intended few seconds. See ADR-006.
+
 ## [0.1.6] - 2026-08-06
 ### Added
 - `FurhatDemoController` now runs a live, single-turn Q&A round on the
