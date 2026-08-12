@@ -30,3 +30,10 @@
 ## PR
 - Link / reference: (added after `gh pr create`)
 - Merge status: pending user
+
+## Follow-up (post-plan, before merge)
+- The Leaflet map rendered incorrectly in the user's real Chrome (misaligned/duplicated tiles). A `ResizeObserver`-based fix was tried and verified working in this session's own browser, but the user reported it was still broken on their end; the root cause was never confirmed.
+- The user then asked to drop OpenStreetMap entirely in favor of a Python data-vis library. Reworked `/facevis` into a server-rendered Plotly (`Scattergeo`) page: `render_facevis_page()` in the new `facevis/map_page.py`, `GET /facevis` now builds the page dynamically instead of serving a static file, `GET /api/facevis/stations` removed (no longer needed — the page fetches server-side), `webui/static/facevis.html` deleted, `plotly` added as a dependency. `air_quality.py` refactored so its AQI-band table (`AqiCategory`) is now the shared source for both the robot's charpack selection and the map's marker color/label (`aqi_category_color`/`aqi_category_label`), reused by neither module owning the other's concern.
+- See ADR-011 for the full reasoning. No version bump for this follow-up — same unmerged PR/cycle, consistent with the earlier `ResizeObserver` commit on this branch.
+- Verified in the Browser pane: the Plotly map renders a clean world projection with no OSM dependency; the error banner correctly shows when `WAQI_API_TOKEN` is unset.
+- Tests: 119/119 passed. Coverage: 100% (unchanged).

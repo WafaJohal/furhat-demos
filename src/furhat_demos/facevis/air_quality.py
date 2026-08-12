@@ -9,34 +9,64 @@ WAQI_BASE_URL = "https://api.waqi.info"
 # World-spanning bounding box: south,west,north,east.
 WORLD_BOUNDS = "-85,-180,85,180"
 
-# (low, high, charpack base name, frame count). "" means no charpack -- reset
-# to the robot's default/neutral face. Categories follow the standard EPA AQI
-# bands; Very Unhealthy (201-300) and Hazardous (301-500) are combined onto
-# the single AirHazard charpack (5 frames), since no separate charpack exists
-# for Very Unhealthy specifically.
-_AQI_CATEGORIES: list[tuple[float, float, str, int]] = [
-    (0, 50, "", 0),
-    (51, 100, "AirModerate", 1),
-    (101, 150, "AirSensGroups", 3),
-    (151, 200, "AirUnhealthy", 4),
-    (201, 500, "AirHazard", 5),
+
+@dataclass(frozen=True)
+class AqiCategory:
+    low: float
+    high: float
+    label: str
+    color: str
+    charpack: str  # "" means no charpack -- reset to the robot's default face
+    frame_count: int
+
+
+# Single source of truth for AQI bands, shared by the robot's face selection
+# (aqi_to_face_id) and the map's marker coloring (aqi_category_label/_color).
+# Standard EPA AQI bands; Very Unhealthy (201-300) and Hazardous (301-500) are
+# combined onto the single AirHazard charpack/color, since no separate
+# charpack exists for Very Unhealthy specifically.
+_AQI_CATEGORIES: list[AqiCategory] = [
+    AqiCategory(0, 50, "Good", "#2a9d3f", "", 0),
+    AqiCategory(51, 100, "Moderate", "#f6c000", "AirModerate", 1),
+    AqiCategory(101, 150, "Unhealthy for Sensitive Groups", "#ff8c00", "AirSensGroups", 3),
+    AqiCategory(151, 200, "Unhealthy", "#e0301e", "AirUnhealthy", 4),
+    AqiCategory(201, 500, "Very Unhealthy / Hazardous", "#7e0023", "AirHazard", 5),
 ]
+
+
+def _category_for_aqi(aqi: float) -> AqiCategory:
+    # _AQI_CATEGORIES covers [0, 500] with no gaps, and clamping guarantees
+    # the value falls in that range, so the loop always returns.
+    clamped = max(0.0, min(500.0, aqi))
+    for category in _AQI_CATEGORIES:
+        if category.low <= clamped <= category.high:
+            return category
+    raise AssertionError(  # pragma: no cover -- unreachable, see above
+        "_AQI_CATEGORIES must cover [0, 500] with no gaps"
+    )
 
 
 def aqi_to_face_id(aqi: float) -> str | None:
     """Map an AQI value to a Furhat face_id (charpack frame), or None for the
     default/neutral face (Good air quality)."""
-    # _AQI_CATEGORIES covers [0, 500] with no gaps, and clamping guarantees
-    # the value falls in that range, so the loop always returns.
+    category = _category_for_aqi(aqi)
+    if not category.charpack:
+        return None
     clamped = max(0.0, min(500.0, aqi))
-    for low, high, charpack, frame_count in _AQI_CATEGORIES:
-        if low <= clamped <= high:
-            if not charpack:
-                return None
-            span = high - low + 1
-            frame = min(frame_count, max(1, math.ceil((clamped - low + 1) / span * frame_count)))
-            return f"{charpack}/{charpack}{frame}"
-    return None  # pragma: no cover -- unreachable, _AQI_CATEGORIES spans [0, 500] with no gaps
+    span = category.high - category.low + 1
+    frame = min(
+        category.frame_count,
+        max(1, math.ceil((clamped - category.low + 1) / span * category.frame_count)),
+    )
+    return f"{category.charpack}/{category.charpack}{frame}"
+
+
+def aqi_category_label(aqi: float) -> str:
+    return _category_for_aqi(aqi).label
+
+
+def aqi_category_color(aqi: float) -> str:
+    return _category_for_aqi(aqi).color
 
 
 @dataclass(frozen=True)

@@ -6,7 +6,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -22,6 +22,7 @@ from furhat_demos.facevis.air_quality import (
     aqi_to_face_id,
     fetch_stations,
 )
+from furhat_demos.facevis.map_page import render_facevis_page
 from furhat_demos.opendemo.documents import (
     delete_uploaded_document,
     list_uploaded_documents,
@@ -151,21 +152,14 @@ def create_app(
             raise HTTPException(status_code=404, detail=f"Unknown document: {filename}")
         return {"status": "ok", "filename": filename}
 
-    @app.get("/facevis")
+    @app.get("/facevis", response_class=HTMLResponse)
     def facevis_page():
-        return FileResponse(STATIC_DIR / "facevis.html")
-
-    @app.get("/api/facevis/stations")
-    def get_facevis_stations():
         try:
             stations = fetch_air_quality_stations()
         except Exception as exc:
             logger.exception("Failed to fetch air quality stations")
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
-        return [
-            {"uid": s.uid, "name": s.name, "lat": s.lat, "lon": s.lon, "aqi": s.aqi}
-            for s in stations
-        ]
+            return render_facevis_page(None, error=str(exc))
+        return render_facevis_page(stations)
 
     @app.post("/api/facevis/set_air_quality")
     def set_air_quality(request: AirQualityRequest):

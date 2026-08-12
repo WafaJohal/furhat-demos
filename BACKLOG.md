@@ -22,7 +22,7 @@ A living list of planned, in-progress, and completed work. Reviewed at the end o
 - Get the user's sign-off on the AQI-to-charpack mapping (band boundaries, "Very Unhealthy + Hazardous combined onto AirHazard") once seen live — see A-015
 
 ## Done
-- feat: FaceVis — `/facevis` map page (Leaflet + WAQI live air quality), charpack-driven robot face (`request_face_config`, reusing the real FaceVis charpack assets), paper-grounded spoken intro on demo start — shipped v0.3.1 (cycle-011)
+- feat: FaceVis — `/facevis` map page (server-rendered Plotly + WAQI live air quality; Leaflet/OpenStreetMap tried first, dropped per ADR-011), charpack-driven robot face (`request_face_config`, reusing the real FaceVis charpack assets), paper-grounded spoken intro on demo start — shipped v0.3.1 (cycle-011)
 - feat: removed the Wafa Johal persona/button; added PDF-based content loading via an admin tab (`/admin`, `POST`/`GET`/`DELETE /api/admin/documents`) — uploaded PDFs join the same content pool `QAEngine` already reads — shipped v0.3.0 (cycle-010)
 - feat: migrated robot connection from the REST-style Remote API (port 54321) to the Realtime API (WebSocket, port 9000) — the real robot/Virtual only had the latter enabled; adds native auth-key support, simplifies voice selection to one call, adds `request_attend_user()` — confirmed working by the user against a real connection — shipped v0.2.0 (cycle-009)
 - feat: continuous multi-question Q&A loop for the opendemo demo (was one question per button press) — exit phrase, double-silence, or 10-turn cap all end the loop with a goodbye — shipped v0.1.8 (cycle-008)

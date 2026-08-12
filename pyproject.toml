@@ -17,6 +17,7 @@ dependencies = [
     "beautifulsoup4>=4.12",
     "pypdf>=5.0",
     "python-multipart>=0.0.9",
+    "plotly>=5.20",
 ]
 
 [project.optional-dependencies]

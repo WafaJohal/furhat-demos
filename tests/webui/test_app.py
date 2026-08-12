@@ -306,30 +306,31 @@ def test_facevis_page_served():
     assert "Air Quality" in res.text
 
 
-def test_facevis_stations_returns_data_from_fetcher():
+def test_facevis_page_renders_stations_from_fetcher():
     from furhat_demos.facevis.air_quality import Station
 
     stations = [Station(uid=1, name="Melbourne", lat=-37.8, lon=144.9, aqi=42.0)]
     app = create_app(controller=RecordingController(), stations_fetcher=lambda: stations)
     client = TestClient(app)
 
-    res = client.get("/api/facevis/stations")
+    res = client.get("/facevis")
 
     assert res.status_code == 200
-    assert res.json() == [{"uid": 1, "name": "Melbourne", "lat": -37.8, "lon": 144.9, "aqi": 42.0}]
+    assert "Melbourne" in res.text
+    assert "aqi-map" in res.text
 
 
-def test_facevis_stations_returns_502_when_fetcher_fails():
+def test_facevis_page_shows_banner_when_fetcher_fails():
     def failing_fetcher():
         raise RuntimeError("WAQI_API_TOKEN is not set")
 
     app = create_app(controller=RecordingController(), stations_fetcher=failing_fetcher)
     client = TestClient(app, raise_server_exceptions=False)
 
-    res = client.get("/api/facevis/stations")
+    res = client.get("/facevis")
 
-    assert res.status_code == 502
-    assert "WAQI_API_TOKEN" in res.json()["detail"]
+    assert res.status_code == 200
+    assert "WAQI_API_TOKEN" in res.text
 
 
 def test_set_air_quality_maps_aqi_to_face_id_and_calls_controller():

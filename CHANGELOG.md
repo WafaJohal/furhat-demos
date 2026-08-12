@@ -9,19 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.1] - 2026-08-12
 ### Added
-- FaceVis: `/facevis` page (Leaflet + OpenStreetMap world map) opens in a new
-  tab when the Air Quality option is selected. `GET /api/facevis/stations`
-  proxies live data from WAQI/aqicn.org (`WAQI_API_TOKEN`, kept server-side).
-  `POST /api/facevis/set_air_quality` maps an AQI value to a real FaceVis
-  `.charpack` frame (`aqi_to_face_id`) and drives the robot's face via
-  `request_face_config`/`request_face_reset`.
+- FaceVis: `/facevis` page opens in a new tab when the Air Quality option is
+  selected, server-rendering a Plotly world map (`render_facevis_page`) with
+  live station data from WAQI/aqicn.org (`WAQI_API_TOKEN`, kept server-side;
+  a Leaflet + OpenStreetMap version was tried first — see ADR-011 for why it
+  was replaced). `POST /api/facevis/set_air_quality` maps an AQI value to a
+  real FaceVis `.charpack` frame (`aqi_to_face_id`) and drives the robot's
+  face via `request_face_config`/`request_face_reset`.
 - The FaceVis demo's spoken intro is now grounded in the actual research
   paper ("I can feel the risks by looking at the robot face", Schömbs,
   Goncalves & Johal, DIS '25) instead of a placeholder line.
 - `DemoController.set_face()` — new method alongside `start_demo()`, fails
   soft (logs and continues) like the existing voice/attend-user handling.
 
-See ADR-010 for the AQI-to-charpack mapping and data-source reasoning.
+See ADR-010 for the AQI-to-charpack mapping and data-source reasoning, and
+ADR-011 for the Leaflet-to-Plotly map pivot.
 
 ## [0.3.0] - 2026-08-12
 ### Removed

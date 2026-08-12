@@ -6,6 +6,8 @@ from furhat_demos.facevis.air_quality import (
     WORLD_BOUNDS,
     RequestsHttpClient,
     Station,
+    aqi_category_color,
+    aqi_category_label,
     aqi_to_face_id,
     fetch_stations,
 )
@@ -41,6 +43,21 @@ def test_aqi_to_face_id_clamps_negative_to_good():
 
 def test_aqi_to_face_id_clamps_above_500_to_worst_hazard_frame():
     assert aqi_to_face_id(999) == "AirHazard/AirHazard5"
+
+
+@pytest.mark.parametrize(
+    "aqi,expected_label,expected_color",
+    [
+        (25, "Good", "#2a9d3f"),
+        (75, "Moderate", "#f6c000"),
+        (125, "Unhealthy for Sensitive Groups", "#ff8c00"),
+        (175, "Unhealthy", "#e0301e"),
+        (350, "Very Unhealthy / Hazardous", "#7e0023"),
+    ],
+)
+def test_aqi_category_label_and_color(aqi, expected_label, expected_color):
+    assert aqi_category_label(aqi) == expected_label
+    assert aqi_category_color(aqi) == expected_color
 
 
 class FakeHttpClient:
