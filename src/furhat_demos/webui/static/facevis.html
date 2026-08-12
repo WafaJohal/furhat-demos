@@ -150,11 +150,11 @@
 
     loadStations();
 
-    // Leaflet computes its tile-grid size from the container's rendered
-    // dimensions at init time, which can be stale right after navigation.
-    window.addEventListener('resize', () => map.invalidateSize());
-    window.addEventListener('load', () => map.invalidateSize());
-    setTimeout(() => map.invalidateSize(), 200);
+    // Leaflet caches the container's size at init time and doesn't notice
+    // later layout changes on its own. ResizeObserver fires once immediately
+    // with the current size (fixing an initial mis-size) and again on any
+    // future change, which is more robust than guessing at fixed timings.
+    new ResizeObserver(() => map.invalidateSize()).observe(document.getElementById('map'));
   </script>
 </body>
 </html>
