@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Protocol
 
+from furhat_demos.facevis.content import FACEVIS_INTRO
 from furhat_demos.opendemo.llm_client import LLMClient
 from furhat_demos.opendemo.personas import build_qa_engine
 
@@ -11,11 +12,15 @@ logger = logging.getLogger(__name__)
 
 class DemoController(Protocol):
     def start_demo(self, demo_id: str, option_id: str) -> None: ...
+    def set_face(self, face_id: str | None) -> None: ...
 
 
 class LoggingDemoController:
     def start_demo(self, demo_id: str, option_id: str) -> None:
         logger.info("start_demo requested: demo_id=%s option_id=%s", demo_id, option_id)
+
+    def set_face(self, face_id: str | None) -> None:
+        logger.info("set_face requested: face_id=%s", face_id)
 
 
 class FurhatRealtimeClient(Protocol):
@@ -27,6 +32,10 @@ class FurhatRealtimeClient(Protocol):
     def request_listen_start(self, **kwargs: object) -> str: ...
     def request_voice_config(self, **kwargs: object) -> object: ...
     def request_attend_user(self) -> object: ...
+    def request_face_config(
+        self, face_id: str | None, visibility: bool, microexpressions: bool
+    ) -> object: ...
+    def request_face_reset(self) -> object: ...
 
 
 _MAX_QA_TURNS = 10
@@ -52,15 +61,12 @@ def _is_exit_phrase(question: str) -> bool:
     return any(phrase in lowered for phrase in _EXIT_PHRASES)
 
 
-# Placeholder spoken intros — replaced by real RAG/persona logic (Demo 1) and
-# FaceVis logic (Demo 2) in later cycles. Keyed by (demo_id, option_id).
+# Spoken intros, keyed by (demo_id, option_id).
 _INTROS: dict[tuple[str, str], str] = {
     ("opendemo", "guide"): (
         "Hi! I'm Furhat, here to help with Open Day questions about our courses and curriculum."
     ),
-    ("facevis", "air-quality"): (
-        "Watch my face as I visualize live air quality data from Melbourne and Victoria."
-    ),
+    ("facevis", "air-quality"): FACEVIS_INTRO,
 }
 
 _DEFAULT_INTRO = "Hi! Let's get started."
@@ -117,3 +123,14 @@ class FurhatDemoController:
             answer = engine.answer(question)
             self._client.request_speak_text(answer, wait=True)
         self._client.request_speak_text(_GOODBYE, wait=False)
+
+    def set_face(self, face_id: str | None) -> None:
+        try:
+            if face_id is None:
+                self._client.request_face_reset()
+            else:
+                self._client.request_face_config(
+                    face_id=face_id, visibility=True, microexpressions=True
+                )
+        except Exception:
+            logger.warning("Failed to set face on Furhat; continuing anyway", exc_info=True)

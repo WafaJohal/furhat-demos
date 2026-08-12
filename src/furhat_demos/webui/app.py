@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Callable
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, UploadFile
@@ -9,8 +10,18 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from furhat_demos.config import FURHAT_AUTH_KEY_ENV_VAR, FURHAT_HOST_ENV_VAR
+from furhat_demos.config import (
+    FURHAT_AUTH_KEY_ENV_VAR,
+    FURHAT_HOST_ENV_VAR,
+    WAQI_API_TOKEN_ENV_VAR,
+)
 from furhat_demos.control import DemoController
+from furhat_demos.facevis.air_quality import (
+    RequestsHttpClient,
+    Station,
+    aqi_to_face_id,
+    fetch_stations,
+)
 from furhat_demos.opendemo.documents import (
     delete_uploaded_document,
     list_uploaded_documents,
@@ -35,13 +46,26 @@ class ConnectRequest(BaseModel):
     auth_key: str | None = None
 
 
+class AirQualityRequest(BaseModel):
+    aqi: float
+
+
+def _default_fetch_stations() -> list[Station]:
+    token = os.environ.get(WAQI_API_TOKEN_ENV_VAR)
+    if not token:
+        raise RuntimeError(f"{WAQI_API_TOKEN_ENV_VAR} is not set")
+    return fetch_stations(RequestsHttpClient(), token)
+
+
 def create_app(
     controller: DemoController | None = None,
     connection: RobotConnection | None = None,
     documents_dir: Path | None = None,
+    stations_fetcher: Callable[[], list[Station]] | None = None,
 ) -> FastAPI:
     connection = connection or RobotConnection()
     docs_dir = documents_dir or DATA_DIR
+    fetch_air_quality_stations = stations_fetcher or _default_fetch_stations
     if controller is not None:
         connection.controller = controller
     elif os.environ.get(FURHAT_HOST_ENV_VAR):
@@ -126,6 +150,28 @@ def create_app(
         if not deleted:
             raise HTTPException(status_code=404, detail=f"Unknown document: {filename}")
         return {"status": "ok", "filename": filename}
+
+    @app.get("/facevis")
+    def facevis_page():
+        return FileResponse(STATIC_DIR / "facevis.html")
+
+    @app.get("/api/facevis/stations")
+    def get_facevis_stations():
+        try:
+            stations = fetch_air_quality_stations()
+        except Exception as exc:
+            logger.exception("Failed to fetch air quality stations")
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        return [
+            {"uid": s.uid, "name": s.name, "lat": s.lat, "lon": s.lon, "aqi": s.aqi}
+            for s in stations
+        ]
+
+    @app.post("/api/facevis/set_air_quality")
+    def set_air_quality(request: AirQualityRequest):
+        face_id = aqi_to_face_id(request.aqi)
+        connection.controller.set_face(face_id)
+        return {"status": "ok", "face_id": face_id}
 
     app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 

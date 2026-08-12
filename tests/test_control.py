@@ -13,6 +13,13 @@ def test_logging_demo_controller_logs(caplog):
     assert "guide" in caplog.text
 
 
+def test_logging_demo_controller_logs_set_face(caplog):
+    controller = LoggingDemoController()
+    with caplog.at_level(logging.INFO):
+        controller.set_face("AirHazard/AirHazard3")
+    assert "AirHazard/AirHazard3" in caplog.text
+
+
 @dataclass
 class FakeRealtimeClient:
     calls: list[dict] = field(default_factory=list)
@@ -22,6 +29,10 @@ class FakeRealtimeClient:
     attend_user_error: Exception | None = None
     listen_results: list[str] = field(default_factory=list)
     listen_call_count: int = 0
+    face_config_calls: list[dict] = field(default_factory=list)
+    face_reset_calls: int = 0
+    face_config_error: Exception | None = None
+    face_reset_error: Exception | None = None
 
     def request_speak_text(self, text, wait=True):
         self.calls.append({"text": text, "wait": wait})
@@ -41,6 +52,18 @@ class FakeRealtimeClient:
         if self.listen_call_count <= len(self.listen_results):
             return self.listen_results[self.listen_call_count - 1]
         return ""
+
+    def request_face_config(self, face_id, visibility, microexpressions):
+        if self.face_config_error is not None:
+            raise self.face_config_error
+        self.face_config_calls.append(
+            {"face_id": face_id, "visibility": visibility, "microexpressions": microexpressions}
+        )
+
+    def request_face_reset(self):
+        self.face_reset_calls += 1
+        if self.face_reset_error is not None:
+            raise self.face_reset_error
 
 
 class FakeLLMClient:
@@ -236,3 +259,45 @@ def test_furhat_demo_controller_stops_after_max_turns():
     assert fake.listen_call_count == _MAX_QA_TURNS
     assert fake_engine.answer.call_count == _MAX_QA_TURNS
     assert "Thanks for chatting" in fake.calls[-1]["text"]
+
+
+def test_furhat_demo_controller_set_face_with_face_id():
+    fake = FakeRealtimeClient()
+    controller = FurhatDemoController(fake)
+
+    controller.set_face("AirHazard/AirHazard3")
+
+    assert fake.face_config_calls == [
+        {"face_id": "AirHazard/AirHazard3", "visibility": True, "microexpressions": True}
+    ]
+    assert fake.face_reset_calls == 0
+
+
+def test_furhat_demo_controller_set_face_none_resets_face():
+    fake = FakeRealtimeClient()
+    controller = FurhatDemoController(fake)
+
+    controller.set_face(None)
+
+    assert fake.face_reset_calls == 1
+    assert fake.face_config_calls == []
+
+
+def test_furhat_demo_controller_set_face_warns_and_continues_on_failure(caplog):
+    fake = FakeRealtimeClient(face_config_error=RuntimeError("robot unreachable"))
+    controller = FurhatDemoController(fake)
+
+    with caplog.at_level(logging.WARNING):
+        controller.set_face("AirHazard/AirHazard3")
+
+    assert "Failed to set face" in caplog.text
+
+
+def test_furhat_demo_controller_set_face_reset_warns_and_continues_on_failure(caplog):
+    fake = FakeRealtimeClient(face_reset_error=RuntimeError("robot unreachable"))
+    controller = FurhatDemoController(fake)
+
+    with caplog.at_level(logging.WARNING):
+        controller.set_face(None)
+
+    assert "Failed to set face" in caplog.text

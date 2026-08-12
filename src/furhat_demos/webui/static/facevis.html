@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>FaceVis — Live Air Quality</title>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHDrzsdBIexnLwWZgZKfKw3z4Q3E="
+    crossorigin=""
+  />
+  <style>
+    :root { color-scheme: light; }
+    html, body {
+      height: 100%;
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      background: #ffffff;
+      color: #111111;
+    }
+    #map {
+      position: absolute;
+      top: 3rem;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #dceefb;
+    }
+    header {
+      height: 3rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 1rem;
+      background: #ffffff;
+      color: #111111;
+      border-bottom: 1px solid #ddd;
+      box-sizing: border-box;
+    }
+    header h1 { font-size: 1rem; margin: 0; }
+    #banner {
+      position: absolute;
+      top: 3.5rem;
+      left: 1rem;
+      right: 1rem;
+      z-index: 1000;
+      background: #fff3cd;
+      color: #664d03;
+      border: 1px solid #ffe69c;
+      border-radius: 6px;
+      padding: 0.6rem 0.9rem;
+      font-size: 0.9rem;
+      display: none;
+    }
+    .popup-btn {
+      margin-top: 0.4rem;
+      padding: 0.4rem 0.7rem;
+      border-radius: 6px;
+      border: 1px solid #333;
+      background: #fff;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>FaceVis — Live Air Quality</h1>
+    <span>Click a station to show it on Furhat's face</span>
+  </header>
+  <div id="banner"></div>
+  <div id="map"></div>
+
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+  <script>
+    const map = L.map('map').setView([20, 0], 2);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 18,
+    }).addTo(map);
+
+    function showBanner(text) {
+      const banner = document.getElementById('banner');
+      banner.textContent = text;
+      banner.style.display = 'block';
+    }
+
+    function colorForAqi(aqi) {
+      if (aqi === null || aqi === undefined || Number.isNaN(aqi)) return '#999999';
+      if (aqi <= 50) return '#2a9d3f';
+      if (aqi <= 100) return '#f6c000';
+      if (aqi <= 150) return '#ff8c00';
+      if (aqi <= 200) return '#e0301e';
+      return '#7e0023';
+    }
+
+    async function setRobotFace(aqi, buttonEl) {
+      buttonEl.textContent = 'Setting face…';
+      try {
+        const res = await fetch('/api/facevis/set_air_quality', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ aqi }),
+        });
+        const data = await res.json().catch(() => ({}));
+        buttonEl.textContent = res.ok ? `Done (${data.face_id || 'default face'})` : 'Failed';
+      } catch (err) {
+        buttonEl.textContent = 'Failed';
+      }
+    }
+
+    async function loadStations() {
+      try {
+        const res = await fetch('/api/facevis/stations');
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          showBanner(data.detail || 'Could not load air quality data.');
+          return;
+        }
+        const stations = await res.json();
+        for (const station of stations) {
+          if (station.aqi === null) continue;
+          const marker = L.circleMarker([station.lat, station.lon], {
+            radius: 7,
+            color: '#333',
+            weight: 1,
+            fillColor: colorForAqi(station.aqi),
+            fillOpacity: 0.85,
+          }).addTo(map);
+
+          const popupDiv = document.createElement('div');
+          const title = document.createElement('strong');
+          title.textContent = station.name;
+          const aqiLine = document.createElement('div');
+          aqiLine.textContent = `AQI: ${station.aqi}`;
+          const btn = document.createElement('button');
+          btn.className = 'popup-btn';
+          btn.textContent = "Show on Furhat's face";
+          btn.addEventListener('click', () => setRobotFace(station.aqi, btn));
+          popupDiv.append(title, aqiLine, btn);
+          marker.bindPopup(popupDiv);
+        }
+      } catch (err) {
+        showBanner('Could not load air quality data.');
+      }
+    }
+
+    loadStations();
+
+    // Leaflet computes its tile-grid size from the container's rendered
+    // dimensions at init time, which can be stale right after navigation.
+    window.addEventListener('resize', () => map.invalidateSize());
+    window.addEventListener('load', () => map.invalidateSize());
+    setTimeout(() => map.invalidateSize(), 200);
+  </script>
+</body>
+</html>

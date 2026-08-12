@@ -1,5 +1,7 @@
 from pathlib import Path
+from unittest.mock import patch
 
+import pytest
 from fastapi.testclient import TestClient
 
 from furhat_demos.webui.app import create_app
@@ -11,9 +13,13 @@ FIXTURE_PDF = Path(__file__).parent.parent / "opendemo" / "fixtures" / "sample_u
 class RecordingController:
     def __init__(self):
         self.calls: list[tuple[str, str]] = []
+        self.set_face_calls: list[str | None] = []
 
     def start_demo(self, demo_id: str, option_id: str) -> None:
         self.calls.append((demo_id, option_id))
+
+    def set_face(self, face_id: str | None) -> None:
+        self.set_face_calls.append(face_id)
 
 
 def make_client():
@@ -70,6 +76,9 @@ def test_default_controller_is_used_when_none_passed():
 class RaisingController:
     def start_demo(self, demo_id: str, option_id: str) -> None:
         raise ConnectionError("No route to host")
+
+    def set_face(self, face_id: str | None) -> None:
+        pass
 
 
 def test_select_returns_503_when_controller_raises():
@@ -147,6 +156,8 @@ def test_robot_connect_failure_returns_502_and_status_reflects_it():
 class FakeRealtimeClient:
     def __init__(self):
         self.say_calls: list[dict] = []
+        self.face_config_calls: list[dict] = []
+        self.face_reset_calls = 0
 
     def connect(self):
         pass
@@ -162,6 +173,14 @@ class FakeRealtimeClient:
 
     def request_listen_start(self, **kwargs):
         return ""
+
+    def request_face_config(self, face_id, visibility, microexpressions):
+        self.face_config_calls.append(
+            {"face_id": face_id, "visibility": visibility, "microexpressions": microexpressions}
+        )
+
+    def request_face_reset(self):
+        self.face_reset_calls += 1
 
 
 def test_select_uses_the_currently_connected_controller():
@@ -276,3 +295,87 @@ def test_admin_delete_rejects_non_uploaded_filename(tmp_path):
     res = client.delete("/api/admin/documents/handbook-comp10001.md")
 
     assert res.status_code == 400
+
+
+def test_facevis_page_served():
+    client, _ = make_client()
+
+    res = client.get("/facevis")
+
+    assert res.status_code == 200
+    assert "Air Quality" in res.text
+
+
+def test_facevis_stations_returns_data_from_fetcher():
+    from furhat_demos.facevis.air_quality import Station
+
+    stations = [Station(uid=1, name="Melbourne", lat=-37.8, lon=144.9, aqi=42.0)]
+    app = create_app(controller=RecordingController(), stations_fetcher=lambda: stations)
+    client = TestClient(app)
+
+    res = client.get("/api/facevis/stations")
+
+    assert res.status_code == 200
+    assert res.json() == [{"uid": 1, "name": "Melbourne", "lat": -37.8, "lon": 144.9, "aqi": 42.0}]
+
+
+def test_facevis_stations_returns_502_when_fetcher_fails():
+    def failing_fetcher():
+        raise RuntimeError("WAQI_API_TOKEN is not set")
+
+    app = create_app(controller=RecordingController(), stations_fetcher=failing_fetcher)
+    client = TestClient(app, raise_server_exceptions=False)
+
+    res = client.get("/api/facevis/stations")
+
+    assert res.status_code == 502
+    assert "WAQI_API_TOKEN" in res.json()["detail"]
+
+
+def test_set_air_quality_maps_aqi_to_face_id_and_calls_controller():
+    controller = RecordingController()
+    app = create_app(controller=controller)
+    client = TestClient(app)
+
+    res = client.post("/api/facevis/set_air_quality", json={"aqi": 350})
+
+    assert res.status_code == 200
+    assert res.json() == {"status": "ok", "face_id": "AirHazard/AirHazard3"}
+    assert controller.set_face_calls == ["AirHazard/AirHazard3"]
+
+
+def test_set_air_quality_good_aqi_resets_face():
+    controller = RecordingController()
+    app = create_app(controller=controller)
+    client = TestClient(app)
+
+    res = client.post("/api/facevis/set_air_quality", json={"aqi": 20})
+
+    assert res.status_code == 200
+    assert res.json() == {"status": "ok", "face_id": None}
+    assert controller.set_face_calls == [None]
+
+
+def test_default_fetch_stations_raises_when_token_unset(monkeypatch):
+    from furhat_demos.webui.app import _default_fetch_stations
+
+    monkeypatch.delenv("WAQI_API_TOKEN", raising=False)
+
+    with pytest.raises(RuntimeError, match="WAQI_API_TOKEN"):
+        _default_fetch_stations()
+
+
+def test_default_fetch_stations_calls_fetch_stations_with_token(monkeypatch):
+    from furhat_demos.webui.app import _default_fetch_stations
+
+    monkeypatch.setenv("WAQI_API_TOKEN", "test-token")
+    fake_stations = ["fake-stations"]
+    with (
+        patch("furhat_demos.webui.app.RequestsHttpClient") as mock_client_cls,
+        patch("furhat_demos.webui.app.fetch_stations", return_value=fake_stations) as mock_fetch,
+    ):
+        result = _default_fetch_stations()
+
+    mock_client_cls.assert_called_once_with()
+    mock_fetch.assert_called_once_with(mock_client_cls.return_value, "test-token")
+    assert result == ["fake-stations"]

@@ -2,12 +2,12 @@
 
 ![CI](https://github.com/WafaJohal/furhat-demos/actions/workflows/ci.yml/badge.svg)
 ![coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
-![version](https://img.shields.io/badge/version-0.3.0-blue)
+![version](https://img.shields.io/badge/version-0.3.1-blue)
 
 Two Furhat robot demos for University of Melbourne, School of Computing and Information Systems:
 
 1. **Open Day Q&A** — Furhat answers Open Day questions grounded on curriculum/pamphlet documents (RAG). Says "I don't know" rather than guessing when it lacks grounding.
-2. **FaceVis** — the [FaceVis](https://github.com/hci-unimelb/FaceVis) research project, connecting the robot's face to a live Melbourne/Victoria dataset as a data-visualization medium.
+2. **FaceVis** — the [FaceVis](https://github.com/hci-unimelb/FaceVis) research project: the robot's face as a data-visualization medium, driving discrete pre-authored facial states from live air quality data on a world map.
 
 Both demos are started from a small **web UI** — a kiosk-style page (tablet or any browser) listing the demos and their options (persona, dataset, etc.). QR-code camera triggering was considered and dropped: Furhat's Remote API has no camera/vision access at all, so reading a QR code would have needed a separate on-robot Kotlin bridge skill just to expose the camera feed. See `docs/adr/0001-webui-over-qr-trigger.md`.
 
@@ -34,7 +34,9 @@ Demo 1's Q&A core is `furhat_demos.opendemo.QAEngine`: it retrieves relevant chu
 
 The content in `data/` comes from two sources, both loaded into the same pool:
 - Real University of Melbourne Handbook material (handbook.unimelb.edu.au), cached ahead of time — run `python scripts/ingest_handbook.py` to (re)generate it. The live demo never calls the Handbook site itself, only this local cache. Currently covers a small representative set (Diploma in Computing, Foundations of Computing, Algorithms and Data Structures); expand `PAGES` in that script to broaden coverage.
-- PDFs uploaded via `/admin` (not linked from the main page, not password-protected — a local/LAN kiosk tool, see `BACKLOG.md`) — `POST /api/admin/documents` extracts text (`pypdf`) and saves it alongside the Handbook content, so `QAEngine` picks it up with no other wiring. `GET`/`DELETE /api/admin/documents` list/remove what's uploaded.
+- PDFs uploaded via `/admin` (linked from the main page, not password-protected — a local/LAN kiosk tool, see `BACKLOG.md`) — `POST /api/admin/documents` extracts text (`pypdf`) and saves it alongside the Handbook content, so `QAEngine` picks it up with no other wiring. `GET`/`DELETE /api/admin/documents` list/remove what's uploaded.
+
+Demo 2 (FaceVis) opens `/facevis` in a new tab (a Leaflet + OpenStreetMap world map) when its option is selected. `GET /api/facevis/stations` proxies live air-quality data from WAQI/aqicn.org (needs your own `WAQI_API_TOKEN`; the token never reaches the browser) so the page can plot stations. Clicking a station calls `POST /api/facevis/set_air_quality`, which maps the AQI value to one of the real FaceVis `.charpack` frames (`furhat_demos.facevis.air_quality.aqi_to_face_id`) and drives the robot's face via `request_face_config`. On demo start, the robot's intro is grounded in the actual FaceVis research paper (`furhat_demos.facevis.content`) rather than a placeholder. The `.charpack` files themselves must be uploaded to the robot via its own web interface first — that's a manual, one-time step this project's code doesn't do remotely. See ADR-010.
 
 See `docs/adr/` for the recorded reasoning behind this and other architectural decisions as they're made.
 

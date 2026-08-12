@@ -123,6 +123,9 @@
         if (res.ok) {
           const data = await res.json();
           status.textContent = `Started: ${data.demo_id} / ${data.option_id}`;
+          if (demoId === 'facevis') {
+            window.open('/facevis', '_blank');
+          }
         } else {
           status.textContent = 'Failed to start demo.';
         }
