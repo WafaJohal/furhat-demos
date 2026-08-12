@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-12
+### Removed
+- **Breaking**: the "Wafa Johal" persona/option (button, intro line, system
+  prompt, bio doc) — the opendemo demo now offers only `guide`.
+
+### Added
+- Admin PDF upload: a new `/admin` page (linked from the main page, not
+  password-protected) to upload PDFs into the Open Day Q&A's knowledge base.
+  `POST /api/admin/documents` extracts text (`pypdf`) and saves it alongside
+  the Handbook content — `QAEngine` picks it up automatically. `GET`/`DELETE
+  /api/admin/documents` list/remove uploads. See ADR-009.
+
 ## [0.2.0] - 2026-08-12
 ### Changed
 - **Breaking**: migrated the robot connection from `furhat_remote_api` (REST,

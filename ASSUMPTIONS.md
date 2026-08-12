@@ -100,3 +100,10 @@ Each entry:
 - **Rationale:** Demonstrated *false* in this dev sandbox: an unrelated Java process already listening on port 9000 (registered service name "cslistener") responded to a raw `request.auth` message with a well-formed `{"type":"response.auth","access":true,"scope":"localhost"}` — passing our connect() check despite not being Furhat at all. Diagnosed as an environment-specific coincidence (not reproduced against real hardware, and not something I can control from this sandbox), but it demonstrates the check isn't as airtight as "successfully speaks the Furhat auth protocol" might suggest.
 - **Status:** invalidated (for the general case — a false positive is possible, if rare)
 - **Notes:** Low priority given how specific the collision would need to be in the real world (something else on the robot's network responding correctly to Furhat's exact auth message shape). Tracked in `BACKLOG.md` as a hardening idea: a follow-up call like `request_voice_status()` after `connect()` would be a stronger "is this actually Furhat" check.
+
+### A-013
+- **Cycle:** cycle-010
+- **Assumption:** Admin-uploaded PDFs should join one shared knowledge pool available to the (now single) `guide` option, rather than being assignable to specific personas/options.
+- **Rationale:** With the Wafa Johal persona removed, there's currently only one opendemo option, so per-persona document assignment isn't yet a meaningful distinction — implemented the simpler shared-pool design rather than building assignment UI for a single-persona system. Revisit if personas return (see `BACKLOG.md`).
+- **Status:** holding
+- **Notes:** Would need a real design decision (not just re-adding the old branching code) if/when a second persona/option is added and per-persona content becomes relevant.

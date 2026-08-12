@@ -63,12 +63,12 @@ def test_furhat_demo_controller_known_combos_have_distinct_intros():
     fake = FakeRealtimeClient()
     controller = FurhatDemoController(fake)
 
-    controller.start_demo("opendemo", "wafa-johal")
+    controller.start_demo("opendemo", "guide")
     controller.start_demo("facevis", "air-quality")
 
     texts = [c["text"] for c in fake.calls]
     assert len(texts) == len(set(texts))
-    assert "Wafa Johal" in texts[0]
+    assert "Open Day" in texts[0]
     assert "air quality" in texts[1]
 
 

@@ -58,9 +58,6 @@ _INTROS: dict[tuple[str, str], str] = {
     ("opendemo", "guide"): (
         "Hi! I'm Furhat, here to help with Open Day questions about our courses and curriculum."
     ),
-    ("opendemo", "wafa-johal"): (
-        "Hello, I'm a persona of Wafa Johal, here to tell you about my research group's work."
-    ),
     ("facevis", "air-quality"): (
         "Watch my face as I visualize live air quality data from Melbourne and Victoria."
     ),

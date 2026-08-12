@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "furhat-demos"
-version = "0.2.0"
+version = "0.3.0"
 description = "Furhat robot demos for University of Melbourne Open Day: LLM Q&A personas and FaceVis data visualization"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -15,6 +15,8 @@ dependencies = [
     "openai>=1.0",
     "httpx>=0.27",
     "beautifulsoup4>=4.12",
+    "pypdf>=5.0",
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]

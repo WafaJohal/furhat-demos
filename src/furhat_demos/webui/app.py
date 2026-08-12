@@ -4,12 +4,19 @@ import logging
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from furhat_demos.config import FURHAT_AUTH_KEY_ENV_VAR, FURHAT_HOST_ENV_VAR
 from furhat_demos.control import DemoController
+from furhat_demos.opendemo.documents import (
+    delete_uploaded_document,
+    list_uploaded_documents,
+    save_uploaded_pdf,
+)
+from furhat_demos.opendemo.qa import DATA_DIR
 from furhat_demos.webui.demos import DEMOS, find_demo, find_option
 from furhat_demos.webui.robot_connection import RobotConnection
 
@@ -31,8 +38,10 @@ class ConnectRequest(BaseModel):
 def create_app(
     controller: DemoController | None = None,
     connection: RobotConnection | None = None,
+    documents_dir: Path | None = None,
 ) -> FastAPI:
     connection = connection or RobotConnection()
+    docs_dir = documents_dir or DATA_DIR
     if controller is not None:
         connection.controller = controller
     elif os.environ.get(FURHAT_HOST_ENV_VAR):
@@ -88,6 +97,35 @@ def create_app(
             "error": state.error,
             "checked_at": state.checked_at,
         }
+
+    @app.get("/admin")
+    def admin_page():
+        return FileResponse(STATIC_DIR / "admin.html")
+
+    @app.get("/api/admin/documents")
+    def get_admin_documents():
+        return [{"filename": doc.filename} for doc in list_uploaded_documents(data_dir=docs_dir)]
+
+    @app.post("/api/admin/documents")
+    async def upload_admin_document(file: UploadFile):
+        if file.content_type != "application/pdf":
+            raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+        pdf_bytes = await file.read()
+        try:
+            doc = save_uploaded_pdf(file.filename or "document.pdf", pdf_bytes, data_dir=docs_dir)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {"filename": doc.filename}
+
+    @app.delete("/api/admin/documents/{filename}")
+    def delete_admin_document(filename: str):
+        try:
+            deleted = delete_uploaded_document(filename, data_dir=docs_dir)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if not deleted:
+            raise HTTPException(status_code=404, detail=f"Unknown document: {filename}")
+        return {"status": "ok", "filename": filename}
 
     app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 

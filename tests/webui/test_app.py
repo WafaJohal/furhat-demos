@@ -1,7 +1,11 @@
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
 from furhat_demos.webui.app import create_app
 from furhat_demos.webui.robot_connection import RobotConnection
+
+FIXTURE_PDF = Path(__file__).parent.parent / "opendemo" / "fixtures" / "sample_upload.pdf"
 
 
 class RecordingController:
@@ -182,3 +186,93 @@ def test_create_app_auto_connects_when_furhat_host_env_var_set(monkeypatch):
 
     assert connection.state.connected is True
     assert connection.state.host == "172.20.10.10"
+
+
+def test_admin_page_served(tmp_path):
+    app = create_app(documents_dir=tmp_path)
+    client = TestClient(app)
+
+    res = client.get("/admin")
+
+    assert res.status_code == 200
+    assert "Admin" in res.text
+
+
+def test_admin_documents_empty_by_default(tmp_path):
+    app = create_app(documents_dir=tmp_path)
+    client = TestClient(app)
+
+    res = client.get("/api/admin/documents")
+
+    assert res.status_code == 200
+    assert res.json() == []
+
+
+def test_admin_upload_pdf_then_lists_and_deletes_it(tmp_path):
+    app = create_app(documents_dir=tmp_path)
+    client = TestClient(app)
+
+    with FIXTURE_PDF.open("rb") as f:
+        res = client.post(
+            "/api/admin/documents",
+            files={"file": ("My Course Guide.pdf", f, "application/pdf")},
+        )
+
+    assert res.status_code == 200
+    filename = res.json()["filename"]
+    assert filename == "uploaded-my-course-guide.md"
+    assert (tmp_path / filename).exists()
+
+    list_res = client.get("/api/admin/documents")
+    assert list_res.json() == [{"filename": filename}]
+
+    delete_res = client.delete(f"/api/admin/documents/{filename}")
+    assert delete_res.status_code == 200
+    assert not (tmp_path / filename).exists()
+
+
+def test_admin_upload_rejects_non_pdf_content_type(tmp_path):
+    app = create_app(documents_dir=tmp_path)
+    client = TestClient(app)
+
+    res = client.post(
+        "/api/admin/documents",
+        files={"file": ("notes.txt", b"hello", "text/plain")},
+    )
+
+    assert res.status_code == 400
+    assert "PDF" in res.json()["detail"]
+
+
+def test_admin_upload_returns_400_when_no_text_extracted(tmp_path):
+    blank_pdf = Path(__file__).parent.parent / "opendemo" / "fixtures" / "blank_page.pdf"
+    app = create_app(documents_dir=tmp_path)
+    client = TestClient(app)
+
+    with blank_pdf.open("rb") as f:
+        res = client.post(
+            "/api/admin/documents",
+            files={"file": ("blank.pdf", f, "application/pdf")},
+        )
+
+    assert res.status_code == 400
+    assert "No extractable text" in res.json()["detail"]
+
+
+def test_admin_delete_unknown_document_returns_404(tmp_path):
+    app = create_app(documents_dir=tmp_path)
+    client = TestClient(app)
+
+    res = client.delete("/api/admin/documents/uploaded-nope.md")
+
+    assert res.status_code == 404
+
+
+def test_admin_delete_rejects_non_uploaded_filename(tmp_path):
+    app = create_app(documents_dir=tmp_path)
+    client = TestClient(app)
+    (tmp_path / "handbook-comp10001.md").write_text("real content")
+
+    res = client.delete("/api/admin/documents/handbook-comp10001.md")
+
+    assert res.status_code == 400
