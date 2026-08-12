@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from furhat_demos.config import FURHAT_HOST_ENV_VAR
+from furhat_demos.config import FURHAT_AUTH_KEY_ENV_VAR, FURHAT_HOST_ENV_VAR
 from furhat_demos.control import DemoController
 from furhat_demos.webui.demos import DEMOS, find_demo, find_option
 from furhat_demos.webui.robot_connection import RobotConnection
@@ -25,6 +25,7 @@ class SelectionRequest(BaseModel):
 
 class ConnectRequest(BaseModel):
     host: str
+    auth_key: str | None = None
 
 
 def create_app(
@@ -35,7 +36,7 @@ def create_app(
     if controller is not None:
         connection.controller = controller
     elif os.environ.get(FURHAT_HOST_ENV_VAR):
-        connection.connect(os.environ[FURHAT_HOST_ENV_VAR])
+        connection.connect(os.environ[FURHAT_HOST_ENV_VAR], os.environ.get(FURHAT_AUTH_KEY_ENV_VAR))
 
     app = FastAPI(title="Furhat Demos")
 
@@ -73,7 +74,7 @@ def create_app(
 
     @app.post("/api/robot/connect")
     def connect_robot(request: ConnectRequest):
-        state = connection.connect(request.host)
+        state = connection.connect(request.host, request.auth_key)
         if not state.connected:
             raise HTTPException(status_code=502, detail=state.error or "Could not connect.")
         return {"host": state.host, "connected": state.connected}

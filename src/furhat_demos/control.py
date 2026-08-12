@@ -18,27 +18,16 @@ class LoggingDemoController:
         logger.info("start_demo requested: demo_id=%s option_id=%s", demo_id, option_id)
 
 
-class VoiceLike(Protocol):
-    name: str
-    language: str | None
+class FurhatRealtimeClient(Protocol):
+    """The subset of furhat_realtime_api.FurhatClient this project uses."""
 
+    def connect(self) -> None: ...
+    def disconnect(self) -> None: ...
+    def request_speak_text(self, text: str, wait: bool = True) -> None: ...
+    def request_listen_start(self, **kwargs: object) -> str: ...
+    def request_voice_config(self, **kwargs: object) -> object: ...
+    def request_attend_user(self) -> object: ...
 
-class ListenResult(Protocol):
-    message: str | None
-
-
-class RemoteApi(Protocol):
-    def say(self, **kwargs: object) -> object: ...
-    def get_voices(self, **kwargs: object) -> list[VoiceLike]: ...
-    def set_voice(self, name: str) -> object: ...
-    def listen(self) -> ListenResult: ...
-
-
-_LISTEN_SENTINELS = {"SILENCE", "INTERRUPTED", "FAILED", None, ""}
-
-_NO_QUESTION_HEARD = (
-    "Sorry, I didn't catch a question there — feel free to come back and try again!"
-)
 
 _MAX_QA_TURNS = 10
 
@@ -49,6 +38,10 @@ _EXIT_PHRASES = (
     "that's all",
     "i'm done",
     "stop asking",
+)
+
+_NO_QUESTION_HEARD = (
+    "Sorry, I didn't catch a question there — feel free to come back and try again!"
 )
 
 _GOODBYE = "Thanks for chatting with me! Come back any time you have more questions."
@@ -77,8 +70,8 @@ _DEFAULT_INTRO = "Hi! Let's get started."
 
 
 class FurhatDemoController:
-    def __init__(self, remote_api: RemoteApi, llm_client: LLMClient | None = None) -> None:
-        self._remote_api = remote_api
+    def __init__(self, client: FurhatRealtimeClient, llm_client: LLMClient | None = None) -> None:
+        self._client = client
         self._llm_client = llm_client
         self._voice_ensured = False
 
@@ -87,27 +80,26 @@ class FurhatDemoController:
             return
         self._voice_ensured = True
         try:
-            voices = self._remote_api.get_voices()
-            english_voice = next(
-                (v for v in voices if v.language and v.language.lower().startswith("en")),
-                None,
-            )
-            if english_voice is None:
-                logger.warning("No English voice found on connected Furhat; leaving voice as-is")
-                return
-            self._remote_api.set_voice(name=english_voice.name)
+            self._client.request_voice_config(language="en-US")
         except Exception:
             logger.warning(
                 "Failed to set an English voice on Furhat; continuing anyway", exc_info=True
             )
 
+    def _ensure_attending_user(self) -> None:
+        try:
+            self._client.request_attend_user()
+        except Exception:
+            logger.warning("Failed to attend to a user on Furhat; continuing anyway", exc_info=True)
+
     def start_demo(self, demo_id: str, option_id: str) -> None:
         self._ensure_english_voice()
+        self._ensure_attending_user()
         text = _INTROS.get((demo_id, option_id), _DEFAULT_INTRO)
         will_run_qa_turn = demo_id == "opendemo" and self._llm_client is not None
-        # Block on the intro when a QA turn follows, so listen() doesn't pick up
-        # the tail of the robot's own intro speech as the visitor's question.
-        self._remote_api.say(text=text, blocking=will_run_qa_turn)
+        # Wait for the intro to finish when a QA turn follows, so listen()
+        # doesn't pick up the tail of the robot's own intro speech.
+        self._client.request_speak_text(text, wait=will_run_qa_turn)
         if will_run_qa_turn:
             self._run_qa_loop(option_id)
 
@@ -115,17 +107,16 @@ class FurhatDemoController:
         engine = build_qa_engine(option_id, self._llm_client)
         consecutive_silences = 0
         for _ in range(_MAX_QA_TURNS):
-            result = self._remote_api.listen()
-            question = getattr(result, "message", None)
-            if question in _LISTEN_SENTINELS:
+            question = self._client.request_listen_start()
+            if not question:
                 consecutive_silences += 1
                 if consecutive_silences >= 2:
                     break
-                self._remote_api.say(text=_NO_QUESTION_HEARD, blocking=True)
+                self._client.request_speak_text(_NO_QUESTION_HEARD, wait=True)
                 continue
             consecutive_silences = 0
             if _is_exit_phrase(question):
                 break
             answer = engine.answer(question)
-            self._remote_api.say(text=answer, blocking=True)
-        self._remote_api.say(text=_GOODBYE, blocking=False)
+            self._client.request_speak_text(answer, wait=True)
+        self._client.request_speak_text(_GOODBYE, wait=False)

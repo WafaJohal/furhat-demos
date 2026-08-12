@@ -68,6 +68,7 @@
     <span class="dot" id="robot-dot"></span>
     <span id="robot-status-text">Checking…</span>
     <input id="robot-host" type="text" placeholder="Robot IP, e.g. 172.20.10.10" />
+    <input id="robot-auth-key" type="password" placeholder="Auth key (if required)" />
     <button id="robot-connect-btn">Connect</button>
     <span id="robot-error"></span>
   </div>
@@ -148,14 +149,16 @@
 
     async function connectRobot() {
       const hostInput = document.getElementById('robot-host');
+      const authKeyInput = document.getElementById('robot-auth-key');
       const host = hostInput.value.trim();
+      const authKey = authKeyInput.value.trim();
       if (!host) return;
       document.getElementById('robot-status-text').textContent = 'Connecting…';
       try {
         const res = await fetch('/api/robot/connect', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ host }),
+          body: JSON.stringify({ host, auth_key: authKey || null }),
         });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));

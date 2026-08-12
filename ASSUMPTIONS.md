@@ -70,8 +70,8 @@ Each entry:
 - **Cycle:** cycle-006
 - **Assumption:** `remote_api.listen()`'s real behavior (blocking until speech or timeout, `Status.message` containing recognized text or one of `SILENCE`/`INTERRUPTED`/`FAILED`) matches Furhat's documented behavior closely enough for `FurhatDemoController._run_single_qa_turn` to work as designed on a real connection.
 - **Rationale:** No live Furhat/Furhat Virtual instance in this environment to test the `listen()` path — only mocked in tests (`FakeRemoteApi.listen()` returning a canned `FakeListenResult`). Real speech recognition quality/latency/timeout behavior is unverified.
-- **Status:** holding
-- **Notes:** Needs manual verification by the user against a real connection — including whether blocking the intro (`say(..., blocking=True)`) actually prevents `listen()` from picking up the tail of the robot's own speech as intended.
+- **Status:** invalidated (superseded)
+- **Notes:** Moot as written — cycle-009 migrated off the Remote API this assumption was about entirely. The equivalent question for the new Realtime API's `request_listen_start()` is implicitly supported: the user confirmed "it works now" after the migration, and their cycle-010 feedback is about persona/content choices rather than the Q&A loop mechanics failing, suggesting the live loop ran successfully enough to evaluate. Not an explicit, detailed confirmation though — see A-010's update.
 
 ### A-009
 - **Cycle:** cycle-007
@@ -84,8 +84,8 @@ Each entry:
 - **Cycle:** cycle-007 (development, post-merge)
 - **Assumption:** Once the Furhat Remote API Skill is actually running on the robot, `RobotConnection.connect()` will succeed without needing an authentication key.
 - **Rationale:** Real-robot testing (2026-08-06) found `curl` to the robot's IP:54321 got "Connection refused" (host reachable, nothing listening) rather than "No route to host" — diagnosed as the Remote API Skill not currently running on the robot, not a network or code issue. Separately, the user raised that an auth key may be needed. Checked: `furhat_remote_api`'s generated client has **no built-in auth mechanism at all** — `Configuration.auth_settings()` returns `{}`; the `api_key`/`api_key_prefix` fields present on `Configuration` are unused swagger-codegen boilerplate. If a key is genuinely required, it would need a custom HTTP header added ourselves — not yet built, pending confirmation.
-- **Status:** holding
-- **Notes:** Deferred to next week per the user — real-robot testing (with the Remote API Skill confirmed running) will show whether a connection actually needs a key (e.g. a 401/403 response) before any auth-key support is designed or built. Building it speculatively now risks guessing at the wrong mechanism.
+- **Status:** invalidated (premise was wrong, not just the answer)
+- **Notes:** The real issue was neither "Remote API Skill not running" nor a missing header — it was the wrong API entirely. Furhat's Realtime API (WebSocket, port 9000) is what the robot/Virtual actually has enabled, and it has first-class `auth_key` support. Migrated in cycle-009 (see ADR-008). User confirmed "it works now" — connection succeeds with the new client.
 
 ### A-011
 - **Cycle:** cycle-008
@@ -93,3 +93,10 @@ Each entry:
 - **Rationale:** This is a fixed keyword list, not a language model — deliberately simple (see ADR-007) and untested against real speech-recognition output, which can be noisy/partial in ways clean text fixtures aren't.
 - **Status:** holding
 - **Notes:** Needs manual verification once the live `listen()` path itself is verified (see A-008) — watch for both false-ends (cut off mid-question) and failure-to-end (visitor leaves, loop just times out via double-silence/max-turn instead of responding to a clear goodbye).
+
+### A-012
+- **Cycle:** cycle-009
+- **Assumption:** `RobotConnection.connect()` succeeding (WebSocket connects, auth handshake returns `access: true`) is sufficient evidence that we're actually talking to a Furhat instance, not just something that happens to speak a similar protocol.
+- **Rationale:** Demonstrated *false* in this dev sandbox: an unrelated Java process already listening on port 9000 (registered service name "cslistener") responded to a raw `request.auth` message with a well-formed `{"type":"response.auth","access":true,"scope":"localhost"}` — passing our connect() check despite not being Furhat at all. Diagnosed as an environment-specific coincidence (not reproduced against real hardware, and not something I can control from this sandbox), but it demonstrates the check isn't as airtight as "successfully speaks the Furhat auth protocol" might suggest.
+- **Status:** invalidated (for the general case — a false positive is possible, if rare)
+- **Notes:** Low priority given how specific the collision would need to be in the real world (something else on the robot's network responding correctly to Furhat's exact auth message shape). Tracked in `BACKLOG.md` as a hardening idea: a follow-up call like `request_voice_status()` after `connect()` would be a stronger "is this actually Furhat" check.

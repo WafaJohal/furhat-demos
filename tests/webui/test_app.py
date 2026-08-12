@@ -90,7 +90,7 @@ def test_robot_status_default_is_disconnected():
 
 
 def test_robot_connect_success_updates_status():
-    connection = RobotConnection(remote_api_factory=lambda host: object(), probe=lambda api: None)
+    connection = RobotConnection(client_factory=lambda host, auth_key: FakeRealtimeClient())
     app = create_app(connection=connection)
     client = TestClient(app)
 
@@ -104,11 +104,28 @@ def test_robot_connect_success_updates_status():
     assert status["host"] == "172.20.10.10"
 
 
-def test_robot_connect_failure_returns_502_and_status_reflects_it():
-    def failing_probe(remote_api):
-        raise ConnectionError("No route to host")
+def test_robot_connect_passes_auth_key_through():
+    received = {}
 
-    connection = RobotConnection(remote_api_factory=lambda host: object(), probe=failing_probe)
+    def factory(host, auth_key):
+        received["auth_key"] = auth_key
+        return FakeRealtimeClient()
+
+    connection = RobotConnection(client_factory=factory)
+    app = create_app(connection=connection)
+    client = TestClient(app)
+
+    client.post("/api/robot/connect", json={"host": "172.20.10.10", "auth_key": "secret-key"})
+
+    assert received["auth_key"] == "secret-key"
+
+
+def test_robot_connect_failure_returns_502_and_status_reflects_it():
+    class RaisingClient:
+        def connect(self):
+            raise ConnectionError("No route to host")
+
+    connection = RobotConnection(client_factory=lambda host, auth_key: RaisingClient())
     app = create_app(connection=connection)
     client = TestClient(app, raise_server_exceptions=False)
 
@@ -123,28 +140,29 @@ def test_robot_connect_failure_returns_502_and_status_reflects_it():
     assert "No route to host" in status["error"]
 
 
-class FullFakeRemoteApi:
+class FakeRealtimeClient:
     def __init__(self):
         self.say_calls: list[dict] = []
 
-    def say(self, **kwargs):
-        self.say_calls.append(kwargs)
-
-    def get_voices(self, **kwargs):
-        return []
-
-    def set_voice(self, name):
+    def connect(self):
         pass
 
-    def listen(self):
-        return None
+    def request_speak_text(self, text, wait=True):
+        self.say_calls.append({"text": text, "wait": wait})
+
+    def request_voice_config(self, **kwargs):
+        pass
+
+    def request_attend_user(self):
+        pass
+
+    def request_listen_start(self, **kwargs):
+        return ""
 
 
 def test_select_uses_the_currently_connected_controller():
-    fake_remote_api = FullFakeRemoteApi()
-    connection = RobotConnection(
-        remote_api_factory=lambda host: fake_remote_api, probe=lambda api: None
-    )
+    fake_client = FakeRealtimeClient()
+    connection = RobotConnection(client_factory=lambda host, auth_key: fake_client)
     app = create_app(connection=connection)
     client = TestClient(app)
 
@@ -152,15 +170,13 @@ def test_select_uses_the_currently_connected_controller():
     res = client.post("/api/select", json={"demo_id": "facevis", "option_id": "air-quality"})
 
     assert res.status_code == 200
-    assert len(fake_remote_api.say_calls) == 1
+    assert len(fake_client.say_calls) == 1
 
 
 def test_create_app_auto_connects_when_furhat_host_env_var_set(monkeypatch):
     monkeypatch.setenv("FURHAT_HOST", "172.20.10.10")
-    fake_remote_api = FullFakeRemoteApi()
-    connection = RobotConnection(
-        remote_api_factory=lambda host: fake_remote_api, probe=lambda api: None
-    )
+    fake_client = FakeRealtimeClient()
+    connection = RobotConnection(client_factory=lambda host, auth_key: fake_client)
 
     create_app(connection=connection)
 

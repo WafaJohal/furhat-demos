@@ -2,7 +2,7 @@
 
 ![CI](https://github.com/WafaJohal/furhat-demos/actions/workflows/ci.yml/badge.svg)
 ![coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
-![version](https://img.shields.io/badge/version-0.1.8-blue)
+![version](https://img.shields.io/badge/version-0.2.0-blue)
 
 Two Furhat robot demos for University of Melbourne, School of Computing and Information Systems:
 
@@ -13,22 +13,22 @@ Both demos are started from a small **web UI** — a kiosk-style page (tablet or
 
 ## Architecture
 
-Both demos are driven by an **external Python control plane** talking to the robot over Furhat's Remote/Realtime API, fronted by the web UI:
+Both demos are driven by an **external Python control plane** talking to the robot over Furhat's **Realtime API** (WebSocket, port 9000 — not the older REST-style Remote API on port 54321, which the real robot/Virtual didn't have enabled; see ADR-008), fronted by the web UI:
 
 ```
 [Web UI: browser/tablet] --HTTP--> [FastAPI app] --> [DemoController]
                                                             │
                                                             ▼
                                                     [Furhat robot, via
-                                                     Remote/Realtime API]
+                                                     Realtime API (WebSocket)]
 ```
 
-`DemoController` is now **runtime state** (`furhat_demos.webui.robot_connection.RobotConnection`), not fixed once at startup: the web UI has a "Robot connection" panel to enter the robot's IP and see live status, backed by `POST /api/robot/connect` and `GET /api/robot/status`. `FURHAT_HOST` still works exactly as before as the startup default — this adds a runtime override on top.
+`DemoController` is **runtime state** (`furhat_demos.webui.robot_connection.RobotConnection`), not fixed once at startup: the web UI has a "Robot connection" panel to enter the robot's IP and an optional auth key (required depending on the Realtime API security level configured on the robot) and see live status, backed by `POST /api/robot/connect` and `GET /api/robot/status`. `FURHAT_HOST`/`FURHAT_AUTH_KEY` still work as the startup default — this adds a runtime override on top.
 
 - No successful connection yet — `LoggingDemoController`, which just logs the selection. The default for local UI development with no robot connected.
-- After a successful connect (via `FURHAT_HOST` at startup, or the UI panel at any time) — `FurhatDemoController`, which connects via `furhat_remote_api`, ensures an English voice is selected (language is tied to voice choice in Furhat's API), speaks an intro for the selected demo/option, and — for the opendemo demos, when `OPENAI_API_KEY` is also set — runs a continuous Q&A loop: listens, answers via that persona's `QAEngine`, speaks the answer, and listens again. The loop ends on an exit phrase ("bye", "goodbye", "stop asking", etc.), two consecutive silences, or a 10-turn safety cap, then says a goodbye line — a single silence just gets one spoken nudge, not an end to the loop. If the robot drops mid-demo, the web UI's `/api/select` returns a clean `503` rather than an unhandled-exception traceback.
+- After a successful connect (via `FURHAT_HOST`/`FURHAT_AUTH_KEY` at startup, or the UI panel at any time) — `FurhatDemoController`, which connects via `furhat_realtime_api.FurhatClient`, sets an English voice (`request_voice_config(language="en-US")`), makes the robot look at the visitor (`request_attend_user()`), speaks an intro for the selected demo/option, and — for the opendemo demos, when `OPENAI_API_KEY` is also set — runs a continuous Q&A loop: listens, answers via that persona's `QAEngine`, speaks the answer, and listens again. The loop ends on an exit phrase ("bye", "goodbye", "stop asking", etc.), two consecutive silences, or a 10-turn safety cap, then says a goodbye line — a single silence just gets one spoken nudge, not an end to the loop. If the robot drops mid-demo, the web UI's `/api/select` returns a clean `503` rather than an unhandled-exception traceback.
 
-Connecting probes the robot (`get_voices`) with a **hard 5-second deadline** enforced independently of the underlying HTTP client — real-world testing found the client's own internal retry behavior means a per-call timeout alone doesn't bound total latency on an unreachable-but-not-actively-refusing host (see ADR-006).
+Connecting enforces a **hard 5-second deadline** on the WebSocket connect+auth handshake, independent of the underlying client's own behavior — same lesson as ADR-006 (found against the old Remote API, re-applied here since nothing guarantees `websockets.connect()` is bounded either).
 
 Demo 1's Q&A core is `furhat_demos.opendemo.QAEngine`: it retrieves relevant chunks by word-overlap scoring, then answers via an injected `LLMClient` (`OpenAIChatClient` for real use, needs `OPENAI_API_KEY`) — or returns a fixed "I don't know" style response without calling the LLM at all when nothing relevant is found. `furhat_demos.opendemo.personas.build_qa_engine(persona_id, llm_client)` builds one per persona: `guide` uses the general Handbook content; `wafa-johal` uses Handbook content plus a dedicated bio doc (`data/personas/wafa-johal.md` — the Handbook doesn't cover individual researchers), with her own system prompt.
 

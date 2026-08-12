@@ -18,3 +18,7 @@ htmlcov/
 *.env.local
 
 .DS_Store
+
+# Large local assets (e.g. FaceVis character packs) -- too big for git,
+# keep them out of the repo entirely rather than accidentally committing.
+assets/

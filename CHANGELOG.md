@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-12
+### Changed
+- **Breaking**: migrated the robot connection from `furhat_remote_api` (REST,
+  port 54321, no auth) to `furhat_realtime_api.FurhatClient` (WebSocket, port
+  9000, built-in `auth_key`). The real robot/Virtual only had the Realtime
+  API enabled — the old Remote API's port was never going to accept a
+  connection regardless of network setup. See ADR-008.
+- `config.build_controller()` removed (was unused by the app; superseded by
+  `RobotConnection`). `FurhatDemoController` now takes a `FurhatRealtimeClient`
+  instead of the old `RemoteApi`.
+- Voice selection collapses to one `request_voice_config(language="en-US")`
+  call, replacing the old manual list-voices/filter/set-voice dance.
+- Added `request_attend_user()` on every `start_demo()` so the robot looks at
+  the visitor.
+- `listen()`'s sentinel handling simplified: the Realtime API returns a plain
+  string (`""` on no speech) instead of `SILENCE`/`INTERRUPTED`/`FAILED`.
+
+### Added
+- Auth-key support: `FURHAT_AUTH_KEY` env var for the startup default, and an
+  auth-key field (password-masked) in the web UI's connection panel, per
+  `/api/robot/connect`.
+
 ## [0.1.8] - 2026-08-10
 ### Added
 - `FurhatDemoController`'s opendemo Q&A turn is now a continuous multi-question
