@@ -70,8 +70,8 @@ Each entry:
 - **Cycle:** cycle-006
 - **Assumption:** `remote_api.listen()`'s real behavior (blocking until speech or timeout, `Status.message` containing recognized text or one of `SILENCE`/`INTERRUPTED`/`FAILED`) matches Furhat's documented behavior closely enough for `FurhatDemoController._run_single_qa_turn` to work as designed on a real connection.
 - **Rationale:** No live Furhat/Furhat Virtual instance in this environment to test the `listen()` path — only mocked in tests (`FakeRemoteApi.listen()` returning a canned `FakeListenResult`). Real speech recognition quality/latency/timeout behavior is unverified.
-- **Status:** holding
-- **Notes:** Needs manual verification by the user against a real connection — including whether blocking the intro (`say(..., blocking=True)`) actually prevents `listen()` from picking up the tail of the robot's own speech as intended.
+- **Status:** invalidated (superseded)
+- **Notes:** Moot as written — cycle-009 migrated off the Remote API this assumption was about entirely. The equivalent question for the new Realtime API's `request_listen_start()` is implicitly supported: the user confirmed "it works now" after the migration, and their cycle-010 feedback is about persona/content choices rather than the Q&A loop mechanics failing, suggesting the live loop ran successfully enough to evaluate. Not an explicit, detailed confirmation though — see A-010's update.
 
 ### A-009
 - **Cycle:** cycle-007
@@ -79,3 +79,45 @@ Each entry:
 - **Rationale:** Chosen based on this cycle's real finding that the underlying HTTP client's internal retries mean an *unreachable* host can hang 10s+ without a hard cap — 5s balances "fail fast enough to be usable" against "don't be so aggressive it misjudges a slow-but-real connection." Not validated against an actual slow/congested network, only against a fast local network and a deliberately-unreachable test IP.
 - **Status:** holding
 - **Notes:** If real-world testing shows the robot's network is often slow enough to need more than 5s, `probe_deadline_seconds` is a constructor parameter on `RobotConnection` and easy to increase.
+
+### A-010
+- **Cycle:** cycle-007 (development, post-merge)
+- **Assumption:** Once the Furhat Remote API Skill is actually running on the robot, `RobotConnection.connect()` will succeed without needing an authentication key.
+- **Rationale:** Real-robot testing (2026-08-06) found `curl` to the robot's IP:54321 got "Connection refused" (host reachable, nothing listening) rather than "No route to host" — diagnosed as the Remote API Skill not currently running on the robot, not a network or code issue. Separately, the user raised that an auth key may be needed. Checked: `furhat_remote_api`'s generated client has **no built-in auth mechanism at all** — `Configuration.auth_settings()` returns `{}`; the `api_key`/`api_key_prefix` fields present on `Configuration` are unused swagger-codegen boilerplate. If a key is genuinely required, it would need a custom HTTP header added ourselves — not yet built, pending confirmation.
+- **Status:** invalidated (premise was wrong, not just the answer)
+- **Notes:** The real issue was neither "Remote API Skill not running" nor a missing header — it was the wrong API entirely. Furhat's Realtime API (WebSocket, port 9000) is what the robot/Virtual actually has enabled, and it has first-class `auth_key` support. Migrated in cycle-009 (see ADR-008). User confirmed "it works now" — connection succeeds with the new client.
+
+### A-011
+- **Cycle:** cycle-008
+- **Assumption:** The exit-phrase heuristic (`"bye"`, `"goodbye"`, `"stop asking"`, etc. as a case-insensitive substring match) correctly identifies when a real visitor wants to end the Q&A loop, without frequently mis-firing (ending mid-question) or failing to fire (visitor says something like "thanks" and walks away, loop doesn't end until the double-silence/max-turn fallback).
+- **Rationale:** This is a fixed keyword list, not a language model — deliberately simple (see ADR-007) and untested against real speech-recognition output, which can be noisy/partial in ways clean text fixtures aren't.
+- **Status:** holding
+- **Notes:** Needs manual verification once the live `listen()` path itself is verified (see A-008) — watch for both false-ends (cut off mid-question) and failure-to-end (visitor leaves, loop just times out via double-silence/max-turn instead of responding to a clear goodbye).
+
+### A-012
+- **Cycle:** cycle-009
+- **Assumption:** `RobotConnection.connect()` succeeding (WebSocket connects, auth handshake returns `access: true`) is sufficient evidence that we're actually talking to a Furhat instance, not just something that happens to speak a similar protocol.
+- **Rationale:** Demonstrated *false* in this dev sandbox: an unrelated Java process already listening on port 9000 (registered service name "cslistener") responded to a raw `request.auth` message with a well-formed `{"type":"response.auth","access":true,"scope":"localhost"}` — passing our connect() check despite not being Furhat at all. Diagnosed as an environment-specific coincidence (not reproduced against real hardware, and not something I can control from this sandbox), but it demonstrates the check isn't as airtight as "successfully speaks the Furhat auth protocol" might suggest.
+- **Status:** invalidated (for the general case — a false positive is possible, if rare)
+- **Notes:** Low priority given how specific the collision would need to be in the real world (something else on the robot's network responding correctly to Furhat's exact auth message shape). Tracked in `BACKLOG.md` as a hardening idea: a follow-up call like `request_voice_status()` after `connect()` would be a stronger "is this actually Furhat" check.
+
+### A-013
+- **Cycle:** cycle-010
+- **Assumption:** Admin-uploaded PDFs should join one shared knowledge pool available to the (now single) `guide` option, rather than being assignable to specific personas/options.
+- **Rationale:** With the Wafa Johal persona removed, there's currently only one opendemo option, so per-persona document assignment isn't yet a meaningful distinction — implemented the simpler shared-pool design rather than building assignment UI for a single-persona system. Revisit if personas return (see `BACKLOG.md`).
+- **Status:** holding
+- **Notes:** Would need a real design decision (not just re-adding the old branching code) if/when a second persona/option is added and per-persona content becomes relevant.
+
+### A-014
+- **Cycle:** cycle-011
+- **Assumption:** WAQI's `/map/bounds` endpoint returns `{"status":"ok","data":[{"lat":...,"lon":...,"uid":...,"aqi":"<string, '-' if unavailable>","station":{"name":"..."}}]}` — the shape `fetch_stations` parses.
+- **Rationale:** Confirmed the general response envelope (`status`/`data` fields) via WAQI's `/feed/` endpoint using their public "demo" token, which works for single-station lookups. The `/map/bounds` endpoint itself requires a real registered API token to test, which wasn't available in this environment — the exact field shape for that specific endpoint is recalled from public documentation/widely-used conventions, not empirically verified end-to-end.
+- **Status:** holding
+- **Notes:** Needs verification by the user with a real `WAQI_API_TOKEN` — if the real response shape differs, `fetch_stations` will likely raise a `KeyError`/`RuntimeError` rather than silently misbehave, since it accesses fields directly rather than guessing at alternatives.
+
+### A-015
+- **Cycle:** cycle-011
+- **Assumption:** The AQI-to-charpack mapping (EPA bands → `AirModerate`/`AirSensGroups`/`AirUnhealthy`/`AirHazard`, with Very Unhealthy and Hazardous combined onto `AirHazard`'s 5 frames) is a reasonable design choice for this demo, not something derived from the source paper itself.
+- **Rationale:** The paper (`assets/schombs2025dis.pdf`) describes the *design process* that produced these face states, not a specific AQI-to-frame numeric mapping — that mapping is this cycle's own addition, needed to drive the existing charpack assets from live data.
+- **Status:** holding
+- **Notes:** Worth the user's sign-off once seen live — the specific boundaries and "Very Unhealthy + Hazardous combined" simplification are judgment calls, not verified against the original research intent.

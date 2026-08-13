@@ -1,39 +1,22 @@
-from furhat_demos.config import FURHAT_HOST_ENV_VAR, OPENAI_API_KEY_ENV_VAR, build_controller
-from furhat_demos.control import FurhatDemoController, LoggingDemoController
+from furhat_demos.config import OPENAI_API_KEY_ENV_VAR, build_llm_client
 from furhat_demos.opendemo.llm_client import OpenAIChatClient
 
 
-def test_build_controller_defaults_to_logging_when_unset(monkeypatch):
-    monkeypatch.delenv(FURHAT_HOST_ENV_VAR, raising=False)
-
-    controller = build_controller()
-
-    assert isinstance(controller, LoggingDemoController)
-
-
-def test_build_controller_defaults_to_logging_when_blank(monkeypatch):
-    monkeypatch.setenv(FURHAT_HOST_ENV_VAR, "")
-
-    controller = build_controller()
-
-    assert isinstance(controller, LoggingDemoController)
-
-
-def test_build_controller_uses_furhat_when_host_set(monkeypatch):
-    monkeypatch.setenv(FURHAT_HOST_ENV_VAR, "localhost")
+def test_build_llm_client_returns_none_when_unset(monkeypatch):
     monkeypatch.delenv(OPENAI_API_KEY_ENV_VAR, raising=False)
 
-    controller = build_controller()
-
-    assert isinstance(controller, FurhatDemoController)
-    assert controller._llm_client is None
+    assert build_llm_client() is None
 
 
-def test_build_controller_wires_llm_client_when_openai_api_key_set(monkeypatch):
-    monkeypatch.setenv(FURHAT_HOST_ENV_VAR, "localhost")
+def test_build_llm_client_returns_none_when_blank(monkeypatch):
+    monkeypatch.setenv(OPENAI_API_KEY_ENV_VAR, "")
+
+    assert build_llm_client() is None
+
+
+def test_build_llm_client_returns_openai_chat_client_when_set(monkeypatch):
     monkeypatch.setenv(OPENAI_API_KEY_ENV_VAR, "test-key")
 
-    controller = build_controller()
+    client = build_llm_client()
 
-    assert isinstance(controller, FurhatDemoController)
-    assert isinstance(controller._llm_client, OpenAIChatClient)
+    assert isinstance(client, OpenAIChatClient)

@@ -34,11 +34,6 @@ DEMOS: tuple[Demo, ...] = (
                 name="Course Guide",
                 description="General Open Day and curriculum questions.",
             ),
-            DemoOption(
-                id="wafa-johal",
-                name="Wafa Johal",
-                description="Talk to a persona of Wafa Johal about her research.",
-            ),
         ),
     ),
     Demo(

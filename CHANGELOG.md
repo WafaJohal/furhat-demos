@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-08-13
+### Added
+- FaceVis: clicking a station on the map now also has the robot speak the
+  station's name and AQI category out loud (e.g. "In Delhi, the air quality
+  index is 310 — Very Unhealthy / Hazardous."), alongside the existing
+  face-driving behavior. `DemoController` gains a `say(text)` method,
+  implemented fail-soft on `FurhatDemoController` like `set_face`.
+
+## [0.3.1] - 2026-08-12
+### Added
+- FaceVis: `/facevis` page opens in a new tab when the Air Quality option is
+  selected, server-rendering a Plotly world map (`render_facevis_page`) with
+  live station data from WAQI/aqicn.org (`WAQI_API_TOKEN`, kept server-side;
+  a Leaflet + OpenStreetMap version was tried first — see ADR-011 for why it
+  was replaced). `POST /api/facevis/set_air_quality` maps an AQI value to a
+  real FaceVis `.charpack` frame (`aqi_to_face_id`) and drives the robot's
+  face via `request_face_config`/`request_face_reset`.
+- The FaceVis demo's spoken intro is now grounded in the actual research
+  paper ("I can feel the risks by looking at the robot face", Schömbs,
+  Goncalves & Johal, DIS '25) instead of a placeholder line.
+- `DemoController.set_face()` — new method alongside `start_demo()`, fails
+  soft (logs and continues) like the existing voice/attend-user handling.
+
+See ADR-010 for the AQI-to-charpack mapping and data-source reasoning, and
+ADR-011 for the Leaflet-to-Plotly map pivot.
+
+## [0.3.0] - 2026-08-12
+### Removed
+- **Breaking**: the "Wafa Johal" persona/option (button, intro line, system
+  prompt, bio doc) — the opendemo demo now offers only `guide`.
+
+### Added
+- Admin PDF upload: a new `/admin` page (linked from the main page, not
+  password-protected) to upload PDFs into the Open Day Q&A's knowledge base.
+  `POST /api/admin/documents` extracts text (`pypdf`) and saves it alongside
+  the Handbook content — `QAEngine` picks it up automatically. `GET`/`DELETE
+  /api/admin/documents` list/remove uploads. See ADR-009.
+
+## [0.2.0] - 2026-08-12
+### Changed
+- **Breaking**: migrated the robot connection from `furhat_remote_api` (REST,
+  port 54321, no auth) to `furhat_realtime_api.FurhatClient` (WebSocket, port
+  9000, built-in `auth_key`). The real robot/Virtual only had the Realtime
+  API enabled — the old Remote API's port was never going to accept a
+  connection regardless of network setup. See ADR-008.
+- `config.build_controller()` removed (was unused by the app; superseded by
+  `RobotConnection`). `FurhatDemoController` now takes a `FurhatRealtimeClient`
+  instead of the old `RemoteApi`.
+- Voice selection collapses to one `request_voice_config(language="en-US")`
+  call, replacing the old manual list-voices/filter/set-voice dance.
+- Added `request_attend_user()` on every `start_demo()` so the robot looks at
+  the visitor.
+- `listen()`'s sentinel handling simplified: the Realtime API returns a plain
+  string (`""` on no speech) instead of `SILENCE`/`INTERRUPTED`/`FAILED`.
+
+### Added
+- Auth-key support: `FURHAT_AUTH_KEY` env var for the startup default, and an
+  auth-key field (password-masked) in the web UI's connection panel, per
+  `/api/robot/connect`.
+
+## [0.1.8] - 2026-08-10
+### Added
+- `FurhatDemoController`'s opendemo Q&A turn is now a continuous multi-question
+  loop instead of one question per button press: keeps listening and
+  answering until an exit phrase ("bye", "goodbye", "stop asking", etc.), two
+  consecutive silences, or a 10-turn safety cap, then says a goodbye line.
+  A single silence gets one spoken nudge and the loop continues.
+
 ## [0.1.7] - 2026-08-06
 ### Added
 - Web UI: a "Robot connection" panel to enter the robot's IP and see live

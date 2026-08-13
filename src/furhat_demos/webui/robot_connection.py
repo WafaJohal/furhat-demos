@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass
@@ -12,41 +11,32 @@ from furhat_demos.config import build_llm_client
 from furhat_demos.control import (
     DemoController,
     FurhatDemoController,
+    FurhatRealtimeClient,
     LoggingDemoController,
-    RemoteApi,
 )
 
 logger = logging.getLogger(__name__)
 
-PROBE_TIMEOUT_SECONDS = 3.0
+# The Realtime API client's own connect() has no exposed timeout, and nothing
+# guarantees the underlying WebSocket handshake is bounded on an unreachable
+# host (see ADR-006 for the equivalent finding against the old Remote API).
+# This is a hard deadline enforced independently of that.
+CONNECT_DEADLINE_SECONDS = 5.0
 
-# The Furhat Remote API's HTTP client retries a failed connection attempt
-# internally (observed: ~3 attempts against an unreachable host), so
-# PROBE_TIMEOUT_SECONDS alone does not bound total wall-clock time -- an
-# unreachable-but-not-actively-refusing host can hang well past it. This is
-# a hard deadline enforced independently of that retry behavior, so
-# connect() always returns in bounded time regardless.
-PROBE_DEADLINE_SECONDS = 5.0
-
-# A shared, never-shut-down pool: if a probe exceeds the deadline, its thread
-# is abandoned (the underlying call can't be cancelled once it's blocked on
-# network I/O) rather than blocking connect() until it finishes.
-_PROBE_EXECUTOR = ThreadPoolExecutor(max_workers=4, thread_name_prefix="robot-probe")
+# A shared, never-shut-down pool: if a connect attempt exceeds the deadline,
+# its thread is abandoned (the underlying call can't be cancelled once it's
+# blocked on network I/O) rather than blocking connect() until it finishes.
+_CONNECT_EXECUTOR = ThreadPoolExecutor(max_workers=4, thread_name_prefix="robot-connect")
 
 
-class RemoteApiFactory(Protocol):
-    def __call__(self, host: str) -> RemoteApi: ...
+class RealtimeClientFactory(Protocol):
+    def __call__(self, host: str, auth_key: str | None) -> FurhatRealtimeClient: ...
 
 
-def default_remote_api_factory(host: str) -> RemoteApi:
-    from furhat_remote_api import FurhatRemoteAPI
+def default_realtime_client_factory(host: str, auth_key: str | None) -> FurhatRealtimeClient:
+    from furhat_realtime_api import FurhatClient
 
-    return FurhatRemoteAPI(host)
-
-
-def default_probe(remote_api: RemoteApi) -> None:
-    """Raises if the robot isn't reachable. A cheap, side-effect-free call."""
-    remote_api.get_voices(_request_timeout=PROBE_TIMEOUT_SECONDS)
+    return FurhatClient(host, auth_key=auth_key)
 
 
 def _now_iso() -> str:
@@ -68,23 +58,21 @@ class RobotConnection:
 
     def __init__(
         self,
-        remote_api_factory: RemoteApiFactory = default_remote_api_factory,
-        probe: Callable[[RemoteApi], None] = default_probe,
-        probe_deadline_seconds: float = PROBE_DEADLINE_SECONDS,
+        client_factory: RealtimeClientFactory = default_realtime_client_factory,
+        connect_deadline_seconds: float = CONNECT_DEADLINE_SECONDS,
     ) -> None:
         self.controller: DemoController = LoggingDemoController()
         self.state = RobotConnectionState()
-        self._remote_api_factory = remote_api_factory
-        self._probe = probe
-        self._probe_deadline_seconds = probe_deadline_seconds
+        self._client_factory = client_factory
+        self._connect_deadline_seconds = connect_deadline_seconds
 
-    def connect(self, host: str) -> RobotConnectionState:
-        remote_api = self._remote_api_factory(host)
-        future = _PROBE_EXECUTOR.submit(self._probe, remote_api)
+    def connect(self, host: str, auth_key: str | None = None) -> RobotConnectionState:
+        client = self._client_factory(host, auth_key)
+        future = _CONNECT_EXECUTOR.submit(client.connect)
         try:
-            future.result(timeout=self._probe_deadline_seconds)
+            future.result(timeout=self._connect_deadline_seconds)
         except FutureTimeoutError:
-            error = f"Timed out after {self._probe_deadline_seconds:.0f}s trying to reach {host}"
+            error = f"Timed out after {self._connect_deadline_seconds:.0f}s trying to reach {host}"
             logger.warning(error)
             self.state = RobotConnectionState(
                 host=host, connected=False, error=error, checked_at=_now_iso()
@@ -97,7 +85,7 @@ class RobotConnection:
             )
             return self.state
 
-        self.controller = FurhatDemoController(remote_api, llm_client=build_llm_client())
+        self.controller = FurhatDemoController(client, llm_client=build_llm_client())
         self.state = RobotConnectionState(
             host=host, connected=True, error=None, checked_at=_now_iso()
         )

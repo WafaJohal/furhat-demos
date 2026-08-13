@@ -2,24 +2,20 @@ import time
 from unittest.mock import MagicMock, patch
 
 from furhat_demos.control import FurhatDemoController, LoggingDemoController
-from furhat_demos.webui.robot_connection import RobotConnection, default_remote_api_factory
+from furhat_demos.webui.robot_connection import RobotConnection, default_realtime_client_factory
 
 
-class FakeRemoteApi:
+class FakeRealtimeClient:
     def __init__(self):
-        self.get_voices_calls: list[dict] = []
+        self.connect_calls = 0
 
-    def get_voices(self, **kwargs):
-        self.get_voices_calls.append(kwargs)
-        return []
+    def connect(self):
+        self.connect_calls += 1
 
 
 def test_connect_success_swaps_controller_and_reports_connected():
-    fake_remote_api = FakeRemoteApi()
-    connection = RobotConnection(
-        remote_api_factory=lambda host: fake_remote_api,
-        probe=lambda remote_api: None,
-    )
+    fake_client = FakeRealtimeClient()
+    connection = RobotConnection(client_factory=lambda host, auth_key: fake_client)
 
     state = connection.connect("172.20.10.10")
 
@@ -28,13 +24,30 @@ def test_connect_success_swaps_controller_and_reports_connected():
     assert state.error is None
     assert state.checked_at is not None
     assert isinstance(connection.controller, FurhatDemoController)
+    assert fake_client.connect_calls == 1
+
+
+def test_connect_passes_auth_key_to_factory():
+    received = {}
+
+    def factory(host, auth_key):
+        received["host"] = host
+        received["auth_key"] = auth_key
+        return FakeRealtimeClient()
+
+    connection = RobotConnection(client_factory=factory)
+
+    connection.connect("172.20.10.10", "secret-key")
+
+    assert received == {"host": "172.20.10.10", "auth_key": "secret-key"}
 
 
 def test_connect_failure_keeps_previous_controller_and_reports_error():
-    connection = RobotConnection(
-        remote_api_factory=lambda host: object(),
-        probe=lambda remote_api: (_ for _ in ()).throw(ConnectionError("No route to host")),
-    )
+    class RaisingClient:
+        def connect(self):
+            raise ConnectionError("No route to host")
+
+    connection = RobotConnection(client_factory=lambda host, auth_key: RaisingClient())
     previous_controller = connection.controller
 
     state = connection.connect("10.0.0.5")
@@ -53,24 +66,14 @@ def test_default_state_is_disconnected_before_any_connect_attempt():
     assert connection.state.host is None
 
 
-def test_default_probe_calls_get_voices_with_bounded_timeout():
-    from furhat_demos.webui.robot_connection import PROBE_TIMEOUT_SECONDS, default_probe
-
-    fake_remote_api = FakeRemoteApi()
-
-    default_probe(fake_remote_api)
-
-    assert fake_remote_api.get_voices_calls == [{"_request_timeout": PROBE_TIMEOUT_SECONDS}]
-
-
-def test_connect_enforces_a_hard_deadline_even_if_the_probe_hangs():
-    def slow_probe(remote_api):
-        time.sleep(0.5)
+def test_connect_enforces_a_hard_deadline_even_if_connect_hangs():
+    class SlowClient:
+        def connect(self):
+            time.sleep(0.5)
 
     connection = RobotConnection(
-        remote_api_factory=lambda host: object(),
-        probe=slow_probe,
-        probe_deadline_seconds=0.05,
+        client_factory=lambda host, auth_key: SlowClient(),
+        connect_deadline_seconds=0.05,
     )
 
     start = time.monotonic()
@@ -79,14 +82,14 @@ def test_connect_enforces_a_hard_deadline_even_if_the_probe_hangs():
 
     assert state.connected is False
     assert "Timed out" in state.error
-    assert elapsed < 0.5  # returned well before the slow probe actually finished
+    assert elapsed < 0.5  # returned well before the slow connect actually finishes
 
 
-def test_default_remote_api_factory_constructs_furhat_remote_api():
+def test_default_realtime_client_factory_constructs_furhat_client():
     fake_instance = MagicMock()
 
-    with patch("furhat_remote_api.FurhatRemoteAPI", return_value=fake_instance) as mock_cls:
-        result = default_remote_api_factory("172.20.10.10")
+    with patch("furhat_realtime_api.FurhatClient", return_value=fake_instance) as mock_cls:
+        result = default_realtime_client_factory("172.20.10.10", "secret-key")
 
-    mock_cls.assert_called_once_with("172.20.10.10")
+    mock_cls.assert_called_once_with("172.20.10.10", auth_key="secret-key")
     assert result is fake_instance
