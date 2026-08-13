@@ -20,6 +20,13 @@ def test_logging_demo_controller_logs_set_face(caplog):
     assert "AirHazard/AirHazard3" in caplog.text
 
 
+def test_logging_demo_controller_logs_say(caplog):
+    controller = LoggingDemoController()
+    with caplog.at_level(logging.INFO):
+        controller.say("The air quality in Delhi is hazardous.")
+    assert "The air quality in Delhi is hazardous." in caplog.text
+
+
 @dataclass
 class FakeRealtimeClient:
     calls: list[dict] = field(default_factory=list)
@@ -33,8 +40,11 @@ class FakeRealtimeClient:
     face_reset_calls: int = 0
     face_config_error: Exception | None = None
     face_reset_error: Exception | None = None
+    speak_error: Exception | None = None
 
     def request_speak_text(self, text, wait=True):
+        if self.speak_error is not None:
+            raise self.speak_error
         self.calls.append({"text": text, "wait": wait})
 
     def request_voice_config(self, **kwargs):
@@ -301,3 +311,22 @@ def test_furhat_demo_controller_set_face_reset_warns_and_continues_on_failure(ca
         controller.set_face(None)
 
     assert "Failed to set face" in caplog.text
+
+
+def test_furhat_demo_controller_say_speaks_without_waiting():
+    fake = FakeRealtimeClient()
+    controller = FurhatDemoController(fake)
+
+    controller.say("The air quality in Delhi is hazardous.")
+
+    assert fake.calls == [{"text": "The air quality in Delhi is hazardous.", "wait": False}]
+
+
+def test_furhat_demo_controller_say_warns_and_continues_on_failure(caplog):
+    fake = FakeRealtimeClient(speak_error=RuntimeError("robot unreachable"))
+    controller = FurhatDemoController(fake)
+
+    with caplog.at_level(logging.WARNING):
+        controller.say("The air quality in Delhi is hazardous.")
+
+    assert "Failed to speak" in caplog.text

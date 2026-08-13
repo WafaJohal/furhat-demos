@@ -41,3 +41,18 @@ def test_render_facevis_page_hides_banner_when_no_error():
     html = render_facevis_page([])
 
     assert "display: none" in html
+
+
+def test_render_facevis_page_customdata_pairs_aqi_with_name():
+    stations = [Station(uid=1, name="Melbourne", lat=-37.8, lon=144.9, aqi=42.0)]
+
+    html = render_facevis_page(stations)
+
+    assert '"customdata":[[42.0,"Melbourne"]]' in html
+
+
+def test_render_facevis_page_click_handler_sends_aqi_and_name():
+    html = render_facevis_page([])
+
+    assert "const [aqi, name] = point.customdata;" in html
+    assert "JSON.stringify({ aqi, name })" in html

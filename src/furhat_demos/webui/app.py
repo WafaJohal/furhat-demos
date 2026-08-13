@@ -19,6 +19,7 @@ from furhat_demos.control import DemoController
 from furhat_demos.facevis.air_quality import (
     RequestsHttpClient,
     Station,
+    aqi_category_label,
     aqi_to_face_id,
     fetch_stations,
 )
@@ -49,6 +50,7 @@ class ConnectRequest(BaseModel):
 
 class AirQualityRequest(BaseModel):
     aqi: float
+    name: str | None = None
 
 
 def _default_fetch_stations() -> list[Station]:
@@ -165,6 +167,11 @@ def create_app(
     def set_air_quality(request: AirQualityRequest):
         face_id = aqi_to_face_id(request.aqi)
         connection.controller.set_face(face_id)
+        location = request.name or "this location"
+        category = aqi_category_label(request.aqi)
+        connection.controller.say(
+            f"In {location}, the air quality index is {request.aqi:g} — {category}."
+        )
         return {"status": "ok", "face_id": face_id}
 
     app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

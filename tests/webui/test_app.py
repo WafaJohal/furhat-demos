@@ -14,12 +14,16 @@ class RecordingController:
     def __init__(self):
         self.calls: list[tuple[str, str]] = []
         self.set_face_calls: list[str | None] = []
+        self.say_calls: list[str] = []
 
     def start_demo(self, demo_id: str, option_id: str) -> None:
         self.calls.append((demo_id, option_id))
 
     def set_face(self, face_id: str | None) -> None:
         self.set_face_calls.append(face_id)
+
+    def say(self, text: str) -> None:
+        self.say_calls.append(text)
 
 
 def make_client():
@@ -78,6 +82,9 @@ class RaisingController:
         raise ConnectionError("No route to host")
 
     def set_face(self, face_id: str | None) -> None:
+        pass
+
+    def say(self, text: str) -> None:
         pass
 
 
@@ -338,11 +345,14 @@ def test_set_air_quality_maps_aqi_to_face_id_and_calls_controller():
     app = create_app(controller=controller)
     client = TestClient(app)
 
-    res = client.post("/api/facevis/set_air_quality", json={"aqi": 350})
+    res = client.post("/api/facevis/set_air_quality", json={"aqi": 350, "name": "Delhi"})
 
     assert res.status_code == 200
     assert res.json() == {"status": "ok", "face_id": "AirHazard/AirHazard3"}
     assert controller.set_face_calls == ["AirHazard/AirHazard3"]
+    assert controller.say_calls == [
+        "In Delhi, the air quality index is 350 — Very Unhealthy / Hazardous."
+    ]
 
 
 def test_set_air_quality_good_aqi_resets_face():
@@ -350,11 +360,23 @@ def test_set_air_quality_good_aqi_resets_face():
     app = create_app(controller=controller)
     client = TestClient(app)
 
-    res = client.post("/api/facevis/set_air_quality", json={"aqi": 20})
+    res = client.post("/api/facevis/set_air_quality", json={"aqi": 20, "name": "Melbourne"})
 
     assert res.status_code == 200
     assert res.json() == {"status": "ok", "face_id": None}
     assert controller.set_face_calls == [None]
+    assert controller.say_calls == ["In Melbourne, the air quality index is 20 — Good."]
+
+
+def test_set_air_quality_without_name_uses_generic_location():
+    controller = RecordingController()
+    app = create_app(controller=controller)
+    client = TestClient(app)
+
+    res = client.post("/api/facevis/set_air_quality", json={"aqi": 20})
+
+    assert res.status_code == 200
+    assert controller.say_calls == ["In this location, the air quality index is 20 — Good."]
 
 
 def test_default_fetch_stations_raises_when_token_unset(monkeypatch):

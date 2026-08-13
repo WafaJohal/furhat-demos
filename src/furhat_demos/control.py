@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 class DemoController(Protocol):
     def start_demo(self, demo_id: str, option_id: str) -> None: ...
     def set_face(self, face_id: str | None) -> None: ...
+    def say(self, text: str) -> None: ...
 
 
 class LoggingDemoController:
@@ -21,6 +22,9 @@ class LoggingDemoController:
 
     def set_face(self, face_id: str | None) -> None:
         logger.info("set_face requested: face_id=%s", face_id)
+
+    def say(self, text: str) -> None:
+        logger.info("say requested: text=%s", text)
 
 
 class FurhatRealtimeClient(Protocol):
@@ -134,3 +138,9 @@ class FurhatDemoController:
                 )
         except Exception:
             logger.warning("Failed to set face on Furhat; continuing anyway", exc_info=True)
+
+    def say(self, text: str) -> None:
+        try:
+            self._client.request_speak_text(text, wait=False)
+        except Exception:
+            logger.warning("Failed to speak on Furhat; continuing anyway", exc_info=True)

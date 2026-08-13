@@ -37,3 +37,10 @@
 - See ADR-011 for the full reasoning. No version bump for this follow-up — same unmerged PR/cycle, consistent with the earlier `ResizeObserver` commit on this branch.
 - Verified in the Browser pane: the Plotly map renders a clean world projection with no OSM dependency; the error banner correctly shows when `WAQI_API_TOKEN` is unset.
 - Tests: 119/119 passed. Coverage: 100% (unchanged).
+
+## Follow-up 2 — spoken AQI on click (0.3.1 → 0.3.2)
+- The user confirmed the real charpacks are now uploaded to the robot (verified via the robot's own face-selection menu) and asked for clicking a map station to also have the robot speak the location and its air quality, not just change face.
+- Added `DemoController.say(text)` (Protocol + `LoggingDemoController` + fail-soft `FurhatDemoController` via `request_speak_text(text, wait=False)`), and had `POST /api/facevis/set_air_quality` call it with `f"In {name}, the air quality index is {aqi:g} — {category}."` (category from the existing `aqi_category_label`). `AirQualityRequest` gained an optional `name` field; the map's `customdata` per point changed from a bare AQI value to an `[aqi, name]` pair so the click handler can send both.
+- Verified end-to-end against a throwaway local server with a recording controller (not the real robot — no route to it from this environment): clicking a station logged both `set_face("AirHazard/AirHazard2")` and `say("In Delhi, the air quality index is 310 — Very Unhealthy / Hazardous.")`.
+- Real-robot connectivity troubleshooting happened alongside this (separate issue): `FURHAT_HOST=172.20.10.10` failed with "No route to host" even though the robot's own web dashboard was reachable — pointed at port 9000 (the Realtime API's hardcoded WebSocket port) specifically not being open, most likely because the Realtime API skill/service wasn't running on the robot at that moment (a different failure mode than cycle-006's earlier same-IP routing issue, where the whole host was unreachable). Not yet confirmed resolved.
+- Tests: 125/125 passed. Coverage: 100% (unchanged). Lint/format: pass.

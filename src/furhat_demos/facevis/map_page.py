@@ -65,13 +65,13 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
     const mapDiv = document.getElementById('aqi-map');
     const statusEl = document.getElementById('status');
 
-    async function setRobotFace(aqi) {
+    async function setRobotFace(aqi, name) {
       statusEl.textContent = 'Setting face…';
       try {
         const res = await fetch('/api/facevis/set_air_quality', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ aqi }),
+          body: JSON.stringify({ aqi, name }),
         });
         const data = await res.json().catch(() => ({}));
         statusEl.textContent = res.ok ? `Done (${data.face_id || 'default face'})` : 'Failed';
@@ -84,7 +84,8 @@ _PAGE_TEMPLATE = """<!DOCTYPE html>
       mapDiv.on('plotly_click', (event) => {
         const point = event.points && event.points[0];
         if (!point || point.customdata === undefined || point.customdata === null) return;
-        setRobotFace(point.customdata);
+        const [aqi, name] = point.customdata;
+        setRobotFace(aqi, name);
       });
     }
   </script>
@@ -97,8 +98,9 @@ def render_facevis_page(stations: list[Station] | None, error: str | None = None
     """Render the FaceVis air-quality page as a self-contained HTML string.
 
     Stations are plotted with Plotly's Scattergeo (no OpenStreetMap tiles).
-    Clicking a marker posts its AQI to /api/facevis/set_air_quality so the
-    robot's face can reflect the selected station.
+    Clicking a marker posts its AQI and name to /api/facevis/set_air_quality
+    so the robot can set its face and speak the selected station's air
+    quality.
     """
     plotted = [s for s in (stations or []) if s.aqi is not None]
 
@@ -107,7 +109,7 @@ def render_facevis_page(stations: list[Station] | None, error: str | None = None
             lat=[s.lat for s in plotted],
             lon=[s.lon for s in plotted],
             text=[f"{s.name}<br>AQI: {s.aqi:g}<br>{aqi_category_label(s.aqi)}" for s in plotted],
-            customdata=[s.aqi for s in plotted],
+            customdata=[[s.aqi, s.name] for s in plotted],
             hoverinfo="text",
             mode="markers",
             marker={

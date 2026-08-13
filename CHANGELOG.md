@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-08-13
+### Added
+- FaceVis: clicking a station on the map now also has the robot speak the
+  station's name and AQI category out loud (e.g. "In Delhi, the air quality
+  index is 310 — Very Unhealthy / Hazardous."), alongside the existing
+  face-driving behavior. `DemoController` gains a `say(text)` method,
+  implemented fail-soft on `FurhatDemoController` like `set_face`.
+
 ## [0.3.1] - 2026-08-12
 ### Added
 - FaceVis: `/facevis` page opens in a new tab when the Air Quality option is
