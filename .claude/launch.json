@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "furhat-webui",
+      "runtimeExecutable": ".venv/bin/uvicorn",
+      "runtimeArgs": ["furhat_demos.webui.app:app", "--port", "8420"],
+      "port": 8420
+    }
+  ]
+}
