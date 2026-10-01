@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-01
+### Removed
+- **Breaking**: the Open Day Q&A demo (`furhat_demos.opendemo`) in full —
+  `QAEngine`, personas, the `OpenAIChatClient`/`LLMClient` protocol, the
+  Handbook scraper and its offline ingestion script
+  (`scripts/ingest_handbook.py`), and the admin PDF-upload page/routes
+  (`/admin`, `/api/admin/documents`) that fed it. FaceVis is now the only
+  demo in this project.
+- **Breaking**: the generic demo-selection web UI (`/api/demos`,
+  `/api/select`, `furhat_demos.webui.demos`) in favor of a single hardcoded
+  `POST /api/facevis/start` action. `index.html` now shows one "Start
+  FaceVis" button instead of a demo/option list.
+- The QA-turn loop, exit-phrase handling, and `llm_client` wiring from
+  `FurhatDemoController`/`RobotConnection`; `config.build_llm_client()` and
+  `OPENAI_API_KEY` are gone.
+- Dependencies no longer needed without opendemo: `openai`, `pypdf`,
+  `beautifulsoup4`, `python-multipart`.
+
+See ADR-0012 for the reasoning.
+
 ## [0.3.2] - 2026-08-13
 ### Added
 - FaceVis: clicking a station on the map now also has the robot speak the
