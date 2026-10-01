@@ -4,8 +4,6 @@ import logging
 from typing import Protocol
 
 from furhat_demos.facevis.content import FACEVIS_INTRO
-from furhat_demos.opendemo.llm_client import LLMClient
-from furhat_demos.opendemo.personas import build_qa_engine
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +31,6 @@ class FurhatRealtimeClient(Protocol):
     def connect(self) -> None: ...
     def disconnect(self) -> None: ...
     def request_speak_text(self, text: str, wait: bool = True) -> None: ...
-    def request_listen_start(self, **kwargs: object) -> str: ...
     def request_voice_config(self, **kwargs: object) -> object: ...
     def request_attend_user(self) -> object: ...
     def request_face_config(
@@ -42,34 +39,8 @@ class FurhatRealtimeClient(Protocol):
     def request_face_reset(self) -> object: ...
 
 
-_MAX_QA_TURNS = 10
-
-_EXIT_PHRASES = (
-    "goodbye",
-    "bye",
-    "no more questions",
-    "that's all",
-    "i'm done",
-    "stop asking",
-)
-
-_NO_QUESTION_HEARD = (
-    "Sorry, I didn't catch a question there — feel free to come back and try again!"
-)
-
-_GOODBYE = "Thanks for chatting with me! Come back any time you have more questions."
-
-
-def _is_exit_phrase(question: str) -> bool:
-    lowered = question.lower()
-    return any(phrase in lowered for phrase in _EXIT_PHRASES)
-
-
 # Spoken intros, keyed by (demo_id, option_id).
 _INTROS: dict[tuple[str, str], str] = {
-    ("opendemo", "guide"): (
-        "Hi! I'm Furhat, here to help with Open Day questions about our courses and curriculum."
-    ),
     ("facevis", "air-quality"): FACEVIS_INTRO,
 }
 
@@ -77,9 +48,8 @@ _DEFAULT_INTRO = "Hi! Let's get started."
 
 
 class FurhatDemoController:
-    def __init__(self, client: FurhatRealtimeClient, llm_client: LLMClient | None = None) -> None:
+    def __init__(self, client: FurhatRealtimeClient) -> None:
         self._client = client
-        self._llm_client = llm_client
         self._voice_ensured = False
 
     def _ensure_english_voice(self) -> None:
@@ -103,30 +73,7 @@ class FurhatDemoController:
         self._ensure_english_voice()
         self._ensure_attending_user()
         text = _INTROS.get((demo_id, option_id), _DEFAULT_INTRO)
-        will_run_qa_turn = demo_id == "opendemo" and self._llm_client is not None
-        # Wait for the intro to finish when a QA turn follows, so listen()
-        # doesn't pick up the tail of the robot's own intro speech.
-        self._client.request_speak_text(text, wait=will_run_qa_turn)
-        if will_run_qa_turn:
-            self._run_qa_loop(option_id)
-
-    def _run_qa_loop(self, option_id: str) -> None:
-        engine = build_qa_engine(option_id, self._llm_client)
-        consecutive_silences = 0
-        for _ in range(_MAX_QA_TURNS):
-            question = self._client.request_listen_start()
-            if not question:
-                consecutive_silences += 1
-                if consecutive_silences >= 2:
-                    break
-                self._client.request_speak_text(_NO_QUESTION_HEARD, wait=True)
-                continue
-            consecutive_silences = 0
-            if _is_exit_phrase(question):
-                break
-            answer = engine.answer(question)
-            self._client.request_speak_text(answer, wait=True)
-        self._client.request_speak_text(_GOODBYE, wait=False)
+        self._client.request_speak_text(text, wait=False)
 
     def set_face(self, face_id: str | None) -> None:
         try:

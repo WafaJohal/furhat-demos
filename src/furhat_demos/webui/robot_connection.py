@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Protocol
 
-from furhat_demos.config import build_llm_client
 from furhat_demos.control import (
     DemoController,
     FurhatDemoController,
@@ -85,7 +84,7 @@ class RobotConnection:
             )
             return self.state
 
-        self.controller = FurhatDemoController(client, llm_client=build_llm_client())
+        self.controller = FurhatDemoController(client)
         self.state = RobotConnectionState(
             host=host, connected=True, error=None, checked_at=_now_iso()
         )

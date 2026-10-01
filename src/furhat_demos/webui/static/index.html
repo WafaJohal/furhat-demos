@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Furhat Demos</title>
+  <title>Furhat FaceVis</title>
   <style>
     :root { color-scheme: light; }
     body {
@@ -17,7 +17,6 @@
     p { color: #333333; }
     .demo { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
     .demo h2 { margin-top: 0; }
-    .options { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
     button {
       padding: 0.6rem 1rem;
       border-radius: 6px;
@@ -58,13 +57,11 @@
     .dot.disconnected { background: #c0392b; }
     #robot-status-text { font-weight: 600; }
     #robot-error { color: #c0392b; font-size: 0.9rem; width: 100%; }
-    .admin-link { margin-top: 2rem; font-size: 0.85rem; }
-    .admin-link a { color: #666; }
   </style>
 </head>
 <body>
-  <h1>Furhat Demos</h1>
-  <p>Pick a demo, then an option, to start it on the robot.</p>
+  <h1>Furhat FaceVis</h1>
+  <p>Connect to the robot, then start the demo.</p>
 
   <div class="robot-panel">
     <span class="dot" id="robot-dot"></span>
@@ -75,57 +72,22 @@
     <span id="robot-error"></span>
   </div>
 
-  <div id="demos"></div>
+  <div class="demo">
+    <h2>FaceVis</h2>
+    <p>See how Furhat's face can visualize live air quality data.</p>
+    <button id="start-btn">Start FaceVis</button>
+  </div>
   <div id="status"></div>
 
-  <p class="admin-link"><a href="/admin">Admin</a></p>
-
   <script>
-    async function loadDemos() {
-      const res = await fetch('/api/demos');
-      const demos = await res.json();
-      const container = document.getElementById('demos');
-      container.innerHTML = '';
-      for (const demo of demos) {
-        const section = document.createElement('div');
-        section.className = 'demo';
-
-        const heading = document.createElement('h2');
-        heading.textContent = demo.name;
-
-        const desc = document.createElement('p');
-        desc.textContent = demo.description;
-
-        const options = document.createElement('div');
-        options.className = 'options';
-        for (const option of demo.options) {
-          const btn = document.createElement('button');
-          btn.textContent = option.name;
-          btn.title = option.description;
-          btn.addEventListener('click', () => selectOption(demo.id, option.id));
-          options.appendChild(btn);
-        }
-
-        section.append(heading, desc, options);
-        container.appendChild(section);
-      }
-    }
-
-    async function selectOption(demoId, optionId) {
+    async function startFacevis() {
       const status = document.getElementById('status');
       status.textContent = 'Starting...';
       try {
-        const res = await fetch('/api/select', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ demo_id: demoId, option_id: optionId }),
-        });
+        const res = await fetch('/api/facevis/start', { method: 'POST' });
         if (res.ok) {
-          const data = await res.json();
-          status.textContent = `Started: ${data.demo_id} / ${data.option_id}`;
-          if (demoId === 'facevis') {
-            window.open('/facevis', '_blank');
-          }
+          status.textContent = 'Started FaceVis.';
+          window.open('/facevis', '_blank');
         } else {
           status.textContent = 'Failed to start demo.';
         }
@@ -180,8 +142,8 @@
     }
 
     document.getElementById('robot-connect-btn').addEventListener('click', connectRobot);
+    document.getElementById('start-btn').addEventListener('click', startFacevis);
 
-    loadDemos();
     refreshRobotStatus();
     setInterval(refreshRobotStatus, 10000);
   </script>
